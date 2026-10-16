@@ -88,7 +88,8 @@ def test_listar_ordenes_con_filtro(cliente, crear_orden, llevar_a):
 
 
 @pytest.mark.parametrize(
-    ("parametros", "campo"), [({"limit": 0}, "limit"), ({"offset": -1}, "offset")]
+    ("parametros", "campo"),
+    [({"limit": 0}, "limit"), ({"limit": 101}, "limit"), ({"offset": -1}, "offset")],
 )
 def test_paginacion_invalida_responde_422(cliente, parametros, campo):
     r = cliente.get("/orders", params=parametros)

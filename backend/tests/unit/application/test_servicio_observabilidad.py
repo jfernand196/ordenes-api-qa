@@ -6,6 +6,7 @@ import pytest
 from app.application.servicio_ordenes import ServicioOrdenes
 from app.domain.estado import Estado
 from app.domain.excepciones import OrdenNoEncontradaError
+from app.domain.orden import LineaProducto
 from app.infrastructure.repositorio import RepositorioEnMemoria
 
 
@@ -37,7 +38,7 @@ def registros_de_ordenes(caplog) -> list[logging.LogRecord]:
 
 def test_crear_registra_un_log_con_id_y_total(servicio, caplog):
     caplog.set_level(logging.INFO, logger="ordenes")
-    orden = servicio.crear("Ana", [("P1", 2, 500)])
+    orden = servicio.crear("Ana", [LineaProducto("P1", 2, 500)])
     [registro] = registros_de_ordenes(caplog)
     assert registro.getMessage() == "orden_creada"
     assert registro.orden_id == str(orden.id)
@@ -46,7 +47,7 @@ def test_crear_registra_un_log_con_id_y_total(servicio, caplog):
 
 def test_cambiar_estado_registra_la_transicion(servicio, caplog):
     caplog.set_level(logging.INFO, logger="ordenes")
-    orden = servicio.crear("Ana", [("P1", 1, 10)])
+    orden = servicio.crear("Ana", [LineaProducto("P1", 1, 10)])
     caplog.clear()
     servicio.cambiar_estado(orden.id, Estado.PAGADA)
     [registro] = registros_de_ordenes(caplog)
@@ -56,7 +57,7 @@ def test_cambiar_estado_registra_la_transicion(servicio, caplog):
 
 
 def test_cambiar_estado_guarda_la_orden_actualizada(servicio, repo):
-    orden = servicio.crear("Ana", [("P1", 1, 10)])
+    orden = servicio.crear("Ana", [LineaProducto("P1", 1, 10)])
     servicio.cambiar_estado(orden.id, Estado.PAGADA)
     assert repo.guardados == [(orden.id, Estado.CREADA), (orden.id, Estado.PAGADA)]
 
@@ -70,5 +71,5 @@ def test_obtener_inexistente_indica_el_id_buscado(servicio):
 
 def test_listar_devuelve_como_maximo_50_por_defecto(servicio):
     for i in range(51):
-        servicio.crear(f"Cliente {i}", [("P1", 1, 1)])
+        servicio.crear(f"Cliente {i}", [LineaProducto("P1", 1, 1)])
     assert len(servicio.listar()) == 50
