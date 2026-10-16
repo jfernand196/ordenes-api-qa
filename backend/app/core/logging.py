@@ -21,7 +21,9 @@ class FormatoJson(logging.Formatter):
         }
         for campo in CAMPOS_EXTRA:
             if hasattr(record, campo):
-                datos[campo] = str(getattr(record, campo))
+                valor = getattr(record, campo)
+                # Números como números para poder filtrarlos; el resto, como texto.
+                datos[campo] = valor if isinstance(valor, int | float) else str(valor)
         return json.dumps(datos, ensure_ascii=False)
 
 
