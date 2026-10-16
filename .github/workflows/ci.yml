@@ -42,7 +42,7 @@ jobs:
           git diff --exit-code docs/TRACEABILITY.md || { echo "::error::docs/TRACEABILITY.md está desactualizado. Ejecuta scripts/generar_trazabilidad.py y haz commit."; exit 1; }
           cat docs/TRACEABILITY.md >> "$GITHUB_STEP_SUMMARY"
   unit-tests:
-    name: Pruebas unitarias e integraciÃ³n con cobertura
+    name: Pruebas unitarias e integración con cobertura
     needs: lint
     runs-on: ubuntu-latest
     defaults:
@@ -90,8 +90,8 @@ jobs:
           cache-dependency-path: backend/requirements-dev.txt
       - run: pip install -r requirements-dev.txt
       - name: Ejecutar mutmut
-        # Quien decide es el quality gate de abajo, que tambiÃ©n falla si no hay estadÃ­sticas.
-        run: mutmut run || echo "mutmut terminÃ³ con cÃ³digo $?"
+        # Quien decide es el quality gate de abajo, que también falla si no hay estadísticas.
+        run: mutmut run || echo "mutmut terminó con código $?"
       - name: Exportar resultados
         if: always()
         run: |
@@ -108,7 +108,7 @@ jobs:
             backend/mutants/mutmut-cicd-stats.json
             backend/reports/mutmut-results.txt
   docker-build:
-    name: ConstrucciÃ³n de imagen Docker
+    name: Construcción de imagen Docker
     needs: unit-tests
     runs-on: ubuntu-latest
     steps:
@@ -129,7 +129,7 @@ jobs:
         if: always()
         run: docker compose down
   acceptance:
-    name: Pruebas de aceptaciÃ³n (Karate)
+    name: Pruebas de aceptación (Karate)
     needs: unit-tests
     runs-on: ubuntu-latest
     steps:
