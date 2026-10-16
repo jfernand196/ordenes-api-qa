@@ -102,3 +102,24 @@ jobs:
           path: |
             backend/mutants/mutmut-cicd-stats.json
             backend/reports/mutmut-results.txt
+  docker-build:
+    name: Construcción de imagen Docker
+    needs: unit-tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build de la imagen (comando del enunciado)
+        run: docker build -t challenge-api:${{ github.sha }} ./backend
+      - name: Prueba de humo con docker compose
+        run: |
+          docker compose up -d --build --wait
+          curl -fsS http://localhost:8080/health
+          curl -fsS -X POST http://localhost:8080/orders \
+            -H "Content-Type: application/json" \
+            -d '{"cliente":"CI","productos":[{"id":"P1","cantidad":1,"valorUnitario":1000}]}'
+      - name: Logs de la API
+        if: always()
+        run: docker compose logs api
+      - name: Apagar
+        if: always()
+        run: docker compose down
