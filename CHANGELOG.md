@@ -2,6 +2,18 @@
 
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y versionado semántico.
 
+## [1.1.1] - 2026-10-17
+
+### Agregado
+- mypy en modo estricto (con el plugin de Pydantic) como quality gate del CI.
+
+### Corregido
+- 11 errores de tipos detectados por mypy; entre ellos, el tipo de los logs JSON, que no reflejaba que `status` y `duracion_ms` son números desde la v1.0.0.
+
+### Cambiado
+- Los skills toman sus plantillas del código real del repositorio, para que no queden desactualizados.
+- El README documenta la regla de idioma: español para el negocio; inglés donde el enunciado o el framework lo fijan.
+
 ## [1.1.0] - 2026-10-16
 
 ### Cambiado

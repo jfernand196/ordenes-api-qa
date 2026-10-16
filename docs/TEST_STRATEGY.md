@@ -57,6 +57,7 @@ Cada prueba se etiqueta con la regla que verifica: `@pytest.mark.rn("RN-xx")` en
 | Gate | Falla si | Dónde se configura |
 |---|---|---|
 | Lint y formato | ruff encuentra errores o código sin formatear | `pyproject.toml` |
+| Tipos | mypy en modo estricto encuentra errores de tipos en `app/` | `pyproject.toml` |
 | Pruebas | falla cualquier prueba (pytest o Karate) | CI |
 | Cobertura | líneas o ramas < 80 % | `pyproject.toml` (`fail_under`) |
 | Mutation score | < 70 % | `scripts/check_mutation_score.py` |

@@ -101,6 +101,7 @@ stateDiagram-v2
 | Repositorio en memoria detrás de una interfaz | El foco del reto es la calidad; cambiar a una base de datos solo requiere otra clase ([ADR-002](docs/adr/002-persistencia-en-memoria.md)) |
 | Interfaz del repositorio en la capa de aplicación (`puertos.py`) | Inversión de dependencias: la aplicación define lo que necesita y la infraestructura lo implementa |
 | Validación en el schema y en el dominio | Defensa en profundidad: el schema protege la API y el dominio protege sus invariantes venga de donde venga la orden |
+| Español para el negocio; inglés donde el enunciado o el framework lo fijan | Rutas (`/orders`), parámetros (`limit`, `offset`), `create_app()` y `/health` siguen el enunciado y las convenciones de FastAPI; entidades, reglas, errores y pruebas usan el lenguaje del negocio |
 | Errores Problem Details con `codigo` de regla | Contrato de error uniforme y trazable a RN-xx ([ADR-003](docs/adr/003-politica-codigos-http.md)) |
 | Dinero en enteros | Evita errores de redondeo de `float` |
 | `DELETE` como cancelación lógica | Una orden de compra es un registro auditable; no se borra |
@@ -186,6 +187,7 @@ npm run dev                    # http://localhost:5173
 | Aceptación (Karate) | Ver abajo | Docker |
 | Componentes (Vitest) | `cd frontend && npm test -- --run` | Node 24 |
 | E2E (Playwright) | `docker compose up -d --build --wait` y luego `cd frontend && npx playwright install chromium && npx playwright test` | Node 24, Docker |
+| Tipos (mypy, modo estricto) | `cd backend && mypy app` | Python 3.12+ |
 | Trazabilidad | `python scripts/generar_trazabilidad.py --salida docs/TRACEABILITY.md --estricto` | Python |
 
 Karate, con Java 17 y Maven instalados:
@@ -220,7 +222,7 @@ Todos corren automáticamente en cada pull request:
 
 | Gate | Falla si |
 |---|---|
-| Lint | ruff encuentra errores o código sin formatear |
+| Lint y tipos | ruff encuentra errores o código sin formatear, o mypy (modo estricto) encuentra errores de tipos |
 | Pruebas | falla cualquier prueba (pytest, Karate, Vitest o Playwright) |
 | Cobertura | líneas o ramas < 80 % |
 | Mutation score | < 70 % |
