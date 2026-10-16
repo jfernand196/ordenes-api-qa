@@ -71,9 +71,7 @@ def test_total_con_varios_productos():
 
 @pytest.mark.rn("RN-03")
 @given(
-    st.lists(
-        st.tuples(st.integers(1, 1_000), st.integers(1, 10_000_000)), min_size=1, max_size=20
-    )
+    st.lists(st.tuples(st.integers(1, 1_000), st.integers(1, 10_000_000)), min_size=1, max_size=20)
 )
 def test_total_es_la_suma_de_cantidad_por_valor(items):
     productos = [linea(c, v, f"P{i}") for i, (c, v) in enumerate(items)]
