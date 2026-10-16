@@ -4,7 +4,11 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Query, Request, Response, status
 
 from app.api.schemas import CambioEstadoIn, OrdenIn, OrdenOut
-from app.application.servicio_ordenes import ServicioOrdenes
+from app.application.servicio_ordenes import (
+    LIMITE_MAXIMO,
+    LIMITE_POR_DEFECTO,
+    ServicioOrdenes,
+)
 from app.domain.estado import Estado
 
 router = APIRouter(prefix="/orders", tags=["órdenes"])
@@ -34,9 +38,7 @@ Servicio = Annotated[ServicioOrdenes, Depends(obtener_servicio)]
 )
 def crear_orden(datos: OrdenIn, response: Response, servicio: Servicio) -> OrdenOut:
     """Crea una orden en estado CREADA. El total se calcula automáticamente (RN-03)."""
-    orden = servicio.crear(
-        datos.cliente, [(p.id, p.cantidad, p.valor_unitario) for p in datos.productos]
-    )
+    orden = servicio.crear(datos.cliente, [p.a_dominio() for p in datos.productos])
     # REST: un 201 indica dónde quedó el recurso; ruta relativa para que funcione tras nginx.
     response.headers["Location"] = f"{router.prefix}/{orden.id}"
     return OrdenOut.desde_dominio(orden)
@@ -46,7 +48,7 @@ def crear_orden(datos: OrdenIn, response: Response, servicio: Servicio) -> Orden
 def listar_ordenes(
     servicio: Servicio,
     estado: Estado | None = None,
-    limit: Annotated[int, Query(ge=1, le=100)] = 50,
+    limit: Annotated[int, Query(ge=1, le=LIMITE_MAXIMO)] = LIMITE_POR_DEFECTO,
     offset: Annotated[int, Query(ge=0)] = 0,
 ) -> list[OrdenOut]:
     """Lista las órdenes, más recientes primero, con filtro opcional por estado."""

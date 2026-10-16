@@ -2,6 +2,14 @@
 
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y versionado semántico.
 
+## [1.1.0] - 2026-10-16
+
+### Cambiado
+- La interfaz del repositorio (`RepositorioOrdenes`) se movió a `app/application/puertos.py`: la capa de aplicación ya no depende de la infraestructura (inversión de dependencias).
+- `Orden` encapsula su estado y sus productos: el estado solo cambia con `cambiar_estado()` y los productos son inmutables.
+- `ServicioOrdenes.crear` recibe `LineaProducto` en lugar de tuplas.
+- Los límites de paginación son constantes con nombre, definidas en un solo lugar.
+
 ## [1.0.0] - 2026-10-16
 
 ### Agregado

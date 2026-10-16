@@ -22,8 +22,8 @@ El objetivo no es solo cumplir los mínimos del reto (80 % de cobertura y 70 % d
 
 | Nivel | Herramienta | Pruebas | Qué valida | Tiempo |
 |---|---|---|---|---|
-| Unitarias | pytest + Hypothesis | 76 | Reglas de dominio, máquina de estados, servicio, mensajes, logs, manejo de errores | ~2 s |
-| Integración | pytest + `TestClient` | 19 | Contrato HTTP de los 5 endpoints y Problem Details | ~1 s |
+| Unitarias | pytest + Hypothesis | 79 | Reglas de dominio, máquina de estados, servicio, mensajes, logs, manejo de errores | ~2 s |
+| Integración | pytest + `TestClient` | 20 | Contrato HTTP de los 5 endpoints y Problem Details | ~1 s |
 | Aceptación | Karate | 15 escenarios | API desplegada en Docker, flujos de negocio de punta a punta | ~20 s |
 
 La base es ancha porque el riesgo principal está en la **lógica de dominio**, que se prueba en milisegundos y sin dependencias. Los niveles superiores son más lentos y caros de mantener, así que no repiten las reglas: confirman que las piezas están bien conectadas y que el contrato HTTP se cumple.
@@ -69,5 +69,5 @@ Todos se evalúan automáticamente en cada pull request.
 
 - **Rendimiento y carga**: el enunciado no los pide y el repositorio es en memoria.
 - **Seguridad** (autenticación, autorización): no forma parte del caso de negocio.
-- **Persistencia real**: la interfaz `OrderRepository` permite agregarla sin cambiar el dominio; sus pruebas serían de integración contra la base de datos.
+- **Persistencia real**: la interfaz `RepositorioOrdenes` permite agregarla sin cambiar el dominio; sus pruebas serían de integración contra la base de datos.
 - **Concurrencia**: el repositorio usa un `Lock`, pero no hay una prueba dedicada de acceso concurrente.

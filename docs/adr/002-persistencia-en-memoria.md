@@ -9,7 +9,7 @@ El enunciado no exige base de datos y el plazo es corto. Lo que se evalúa es la
 
 ## Decisión
 
-Usar un repositorio en memoria (`RepositorioEnMemoria`) con un `Lock` para el acceso concurrente, detrás de la interfaz `OrderRepository` (un `Protocol` con `guardar`, `obtener` y `listar`). El servicio depende de la interfaz, no de la implementación (inversión de dependencias).
+Usar un repositorio en memoria (`RepositorioEnMemoria`) con un `Lock` para el acceso concurrente, detrás de la interfaz `RepositorioOrdenes` (un `Protocol` con `guardar`, `obtener` y `listar`). El servicio depende de la interfaz, no de la implementación (inversión de dependencias).
 
 ## Alternativas consideradas
 
@@ -18,5 +18,5 @@ Usar un repositorio en memoria (`RepositorioEnMemoria`) con un `Lock` para el ac
 ## Consecuencias
 
 - Los datos se pierden al reiniciar la API. Es aceptable para el reto y se documenta.
-- Cambiar a una base de datos real solo requiere una nueva implementación de `OrderRepository`; el dominio y el servicio no cambian.
+- Cambiar a una base de datos real solo requiere una nueva implementación de `RepositorioOrdenes`; el dominio y el servicio no cambian.
 - Cada prueba usa una app nueva (`create_app()`) con su propio repositorio, sin estado compartido entre pruebas.

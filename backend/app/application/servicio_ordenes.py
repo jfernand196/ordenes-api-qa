@@ -1,21 +1,23 @@
 import logging
 from uuid import UUID
 
+from app.application.puertos import RepositorioOrdenes
 from app.domain.estado import Estado
 from app.domain.excepciones import OrdenNoEncontradaError
 from app.domain.orden import LineaProducto, Orden
-from app.infrastructure.repositorio import OrderRepository
 
 logger = logging.getLogger("ordenes")
 
+LIMITE_POR_DEFECTO = 50
+LIMITE_MAXIMO = 100
+
 
 class ServicioOrdenes:
-    def __init__(self, repositorio: OrderRepository) -> None:
+    def __init__(self, repositorio: RepositorioOrdenes) -> None:
         self._repo = repositorio
 
-    def crear(self, cliente: str, productos: list[tuple[str, int, int]]) -> Orden:
-        lineas = [LineaProducto(id=i, cantidad=c, valor_unitario=v) for i, c, v in productos]
-        orden = Orden(cliente=cliente, productos=lineas)
+    def crear(self, cliente: str, productos: list[LineaProducto]) -> Orden:
+        orden = Orden(cliente=cliente, productos=productos)
         self._repo.guardar(orden)
         logger.info("orden_creada", extra={"orden_id": str(orden.id), "total": orden.total})
         return orden
@@ -26,7 +28,9 @@ class ServicioOrdenes:
             raise OrdenNoEncontradaError(f"No existe una orden con id {orden_id}.")
         return orden
 
-    def listar(self, estado: Estado | None = None, limit: int = 50, offset: int = 0) -> list[Orden]:
+    def listar(
+        self, estado: Estado | None = None, limit: int = LIMITE_POR_DEFECTO, offset: int = 0
+    ) -> list[Orden]:
         return self._repo.listar(estado, limit, offset)
 
     def cambiar_estado(self, orden_id: UUID, nuevo: Estado) -> Orden:

@@ -4,7 +4,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from pydantic.alias_generators import to_camel
 
 from app.domain.estado import Estado
-from app.domain.orden import Orden
+from app.domain.orden import LineaProducto, Orden
 
 
 class Base(BaseModel):
@@ -19,6 +19,9 @@ class ProductoIn(Entrada):
     id: str = Field(min_length=1, examples=["P001"])
     cantidad: int = Field(gt=0, examples=[2])  # RN-02
     valor_unitario: int = Field(gt=0, examples=[100000])
+
+    def a_dominio(self) -> LineaProducto:
+        return LineaProducto(id=self.id, cantidad=self.cantidad, valor_unitario=self.valor_unitario)
 
 
 class OrdenIn(Entrada):

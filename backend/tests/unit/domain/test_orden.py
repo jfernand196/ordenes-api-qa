@@ -103,3 +103,23 @@ def test_cada_orden_tiene_un_id_distinto():
     a = Orden(cliente="Ana", productos=[linea()])
     b = Orden(cliente="Ana", productos=[linea()])
     assert a.id != b.id
+
+
+def test_el_estado_no_se_puede_asignar_saltandose_la_maquina_de_estados():
+    orden = Orden(cliente="Ana", productos=[linea()])
+    with pytest.raises(AttributeError):
+        orden.estado = Estado.ENTREGADA
+    assert orden.estado == Estado.CREADA
+
+
+@pytest.mark.rn("RN-01")
+def test_los_productos_no_cambian_aunque_cambie_la_lista_original():
+    lineas = [linea()]
+    orden = Orden(cliente="Ana", productos=lineas)
+    lineas.clear()
+    assert len(orden.productos) == 1
+    assert isinstance(orden.productos, tuple)
+
+
+def test_la_orden_conserva_el_cliente():
+    assert Orden(cliente="Juan Pérez", productos=[linea()]).cliente == "Juan Pérez"

@@ -9,7 +9,7 @@ Solución al reto técnico de **Ingeniero/a de Software QA**: una API REST para 
 | Cobertura de líneas | **100 %** | 80 % |
 | Cobertura de ramas | **100 %** | 80 % |
 | Mutation score | **100 %** (113 de 113 mutantes) | 70 % |
-| Pruebas unitarias e integración (pytest) | **95** | — |
+| Pruebas unitarias e integración (pytest) | **99** | — |
 | Escenarios de aceptación (Karate) | **15** (4 obligatorios + 11 justificados) | 4 |
 | Pruebas de componentes (Vitest) | **7** | — |
 | Flujos E2E (Playwright) | **6** | — |
@@ -52,7 +52,7 @@ El backend sigue una **arquitectura hexagonal ligera**: el dominio no depende de
 ```
 backend/
   app/domain/          Estado, excepciones, máquina de estados, Orden
-  app/application/     Servicio de órdenes (casos de uso)
+  app/application/     Servicio de órdenes (casos de uso) y puertos (interfaces)
   app/infrastructure/  Repositorio en memoria
   app/api/             Endpoints, schemas y manejo de errores
   app/core/            Logging JSON y X-Request-ID
@@ -99,6 +99,8 @@ stateDiagram-v2
 | FastAPI + Pydantic v2 | Validación declarativa y documentación OpenAPI automática en `/docs` |
 | Dominio sin dependencias del framework | Pruebas unitarias rápidas y mutation testing eficaz ([ADR-001](docs/adr/001-arquitectura-hexagonal.md)) |
 | Repositorio en memoria detrás de una interfaz | El foco del reto es la calidad; cambiar a una base de datos solo requiere otra clase ([ADR-002](docs/adr/002-persistencia-en-memoria.md)) |
+| Interfaz del repositorio en la capa de aplicación (`puertos.py`) | Inversión de dependencias: la aplicación define lo que necesita y la infraestructura lo implementa |
+| Validación en el schema y en el dominio | Defensa en profundidad: el schema protege la API y el dominio protege sus invariantes venga de donde venga la orden |
 | Errores Problem Details con `codigo` de regla | Contrato de error uniforme y trazable a RN-xx ([ADR-003](docs/adr/003-politica-codigos-http.md)) |
 | Dinero en enteros | Evita errores de redondeo de `float` |
 | `DELETE` como cancelación lógica | Una orden de compra es un registro auditable; no se borra |
@@ -208,7 +210,7 @@ El reporte queda en `acceptance-tests/target/karate-reports/karate-summary.html`
 La estrategia completa está en [TEST_STRATEGY.md](docs/TEST_STRATEGY.md): matriz de riesgo, pirámide de pruebas, técnicas aplicadas y lo que quedó fuera de alcance. En resumen:
 
 - **Pruebas priorizadas por riesgo.** Las transiciones de estado y el cálculo del total, de mayor impacto económico, se prueban en todos los niveles; entre otras cosas, con una tabla literal de las 25 combinaciones origen → destino.
-- **Pirámide.** 76 pruebas unitarias, 19 de integración, 15 escenarios Karate, 7 pruebas de componentes y 6 flujos E2E. La base es ancha porque el riesgo principal está en el dominio, que se prueba en milisegundos.
+- **Pirámide.** 79 pruebas unitarias, 20 de integración, 15 escenarios Karate, 7 pruebas de componentes y 6 flujos E2E. La base es ancha porque el riesgo principal está en el dominio, que se prueba en milisegundos.
 - **Mutation testing, porque la cobertura no basta.** La primera corrida dio **58,4 %** con **100 % de cobertura**: el código se ejecutaba, pero no se verificaban los logs, los mensajes de error, el límite de paginación ni la llamada a `guardar`. Con las pruebas que faltaban, el score llegó a **100 %**. No hay mutantes aceptados.
 - **Trazabilidad.** Cada prueba lleva la regla que verifica (`@pytest.mark.rn("RN-04")`, `@RN-04` en Karate y en Playwright), y [TRACEABILITY.md](docs/TRACEABILITY.md) se genera automáticamente con la matriz regla → pruebas en los tres niveles.
 
