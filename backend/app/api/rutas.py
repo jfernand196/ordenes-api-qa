@@ -1,4 +1,4 @@
-from typing import Annotated, Any
+from typing import Annotated, Any, cast
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query, Request, Response, status
@@ -27,7 +27,8 @@ def respuestas(*codigos: int) -> dict[int | str, dict[str, Any]]:
 
 
 def obtener_servicio(request: Request) -> ServicioOrdenes:
-    return request.app.state.servicio
+    # app.state no tiene tipos: create_app() garantiza que aquí hay un ServicioOrdenes.
+    return cast(ServicioOrdenes, request.app.state.servicio)
 
 
 Servicio = Annotated[ServicioOrdenes, Depends(obtener_servicio)]
