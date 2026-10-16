@@ -17,14 +17,14 @@ Contenido:
 
 ### vite.config.ts
 ```ts
-/// <reference types="vitest/config" />
-import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
+import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
   plugins: [react()],
   server: {
     proxy: {
+      // En desarrollo, /api/orders -> http://localhost:8080/orders (en Docker lo hace nginx).
       '/api': {
         target: 'http://localhost:8080',
         changeOrigin: true,
@@ -43,6 +43,11 @@ export default defineConfig({
 ### src/test/setup.ts
 ```ts
 import '@testing-library/jest-dom/vitest';
+import { cleanup } from '@testing-library/react';
+import { afterEach } from 'vitest';
+
+// Sin `globals: true`, Testing Library no limpia el DOM sola entre pruebas.
+afterEach(() => cleanup());
 ```
 
 ---
@@ -103,7 +108,10 @@ export class ApiError extends Error {
 
 export function aApiError(error: unknown): ApiError {
   if (error instanceof ApiError) return error;
-  return new ApiError(0, { title: 'No se pudo conectar con la API', status: 0 });
+  return new ApiError(0, {
+    title: 'No se pudo conectar con la API. Verifica que esté en ejecución y recarga la página.',
+    status: 0,
+  });
 }
 
 async function solicitar<T>(ruta: string, init?: RequestInit): Promise<T> {
@@ -211,7 +219,7 @@ export function useOrden(id: string) {
     };
   }, [id]);
 
-  // setOrden permite reemplazar la orden tras una acción sin volver a pedirla.
+  // Reemplaza la orden tras una acción sin volver a pedirla a la API.
   const setOrden = (orden: Orden) => setCarga({ tipo: 'ok', datos: orden });
   return { carga, setOrden };
 }
@@ -246,7 +254,13 @@ export function errorDeCampo(error: ApiError | null, campo: string): string | un
 ```tsx
 import type { Estado } from '../api/tipos';
 
-export function EstadoBadge({ estado, grande = false, testId }: { estado: Estado; grande?: boolean; testId?: string }) {
+interface Props {
+  estado: Estado;
+  grande?: boolean;
+  testId?: string;
+}
+
+export function EstadoBadge({ estado, grande = false, testId }: Props) {
   const clases = `estado estado-${estado.toLowerCase()}${grande ? ' estado-grande' : ''}`;
   return (
     <span className={clases} data-testid={testId}>
@@ -655,6 +669,7 @@ import { createRoot } from 'react-dom/client';
 import App from './App';
 import './estilos.css'; // del skill ui-ux-experto (assets/estilos.css)
 
+// El único `!` aceptado: #root existe siempre en index.html.
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <App />

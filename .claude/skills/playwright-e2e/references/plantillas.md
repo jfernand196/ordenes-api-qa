@@ -219,6 +219,7 @@ test.describe('Gestión de órdenes de compra', () => {
     await nueva.enviar();
 
     await expect(page).toHaveURL(/\/ordenes\/[0-9a-f-]{36}$/);
+    await expect(page.getByTestId('aviso')).toHaveText('Orden creada.');
     await expect(new DetallePage(page).estado).toHaveText('CREADA');
   });
 
@@ -245,6 +246,7 @@ test.describe('Gestión de órdenes de compra', () => {
     for (const estado of ['PAGADA', 'ENVIADA', 'ENTREGADA'] as const) {
       await detalle.cambiarEstadoA(estado);
       await expect(detalle.estado).toHaveText(estado);
+      await expect(page.getByTestId('aviso')).toContainText(estado.toLowerCase());
     }
 
     await expect(detalle.botonCancelar).toHaveCount(0);
@@ -272,6 +274,18 @@ test.describe('Gestión de órdenes de compra', () => {
 
     await expect(detalle.estado).toHaveText('ENTREGADA');
     await expect(detalle.botonCancelar).toHaveCount(0);
+  });
+
+  test('mostrar el error de la API junto al campo inválido', { tag: ['@RN-02'] }, async ({ page }) => {
+    const nueva = new NuevaOrdenPage(page);
+    await nueva.abrir();
+    await nueva.llenar('Ana', [{ id: 'P001', cantidad: 0, valorUnitario: 1000 }]);
+
+    await nueva.enviar();
+
+    await expect(page.getByText('Debe ser mayor que 0.')).toBeVisible();
+    await expect(page.getByTestId('input-cantidad-0')).toHaveAttribute('aria-invalid', 'true');
+    await expect(page).toHaveURL(/\/ordenes\/nueva$/);
   });
 });
 ```
