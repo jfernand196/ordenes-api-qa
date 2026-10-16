@@ -1,0 +1,32 @@
+[project]
+name = "ordenes-api"
+version = "1.0.0"
+requires-python = ">=3.12"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "-ra --strict-markers"
+markers = [
+    "rn(id): regla de negocio que valida la prueba (RN-01 a RN-06)",
+]
+
+[tool.coverage.run]
+branch = true
+source = ["app"]
+
+[tool.coverage.report]
+fail_under = 80
+show_missing = true
+
+[tool.mutmut]
+paths_to_mutate = ["app/"]
+do_not_mutate = ["app/api/*", "app/core/*", "app/infrastructure/*", "app/main.py"]
+tests_dir = ["tests/"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "SIM"]
