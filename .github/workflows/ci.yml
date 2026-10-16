@@ -69,3 +69,36 @@ jobs:
             backend/htmlcov
             backend/coverage.xml
             backend/reports/junit.xml
+  mutation:
+    name: Mutation testing (quality gate >= 70 %)
+    needs: unit-tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: backend/requirements-dev.txt
+      - run: pip install -r requirements-dev.txt
+      - name: Ejecutar mutmut
+        # Quien decide es el quality gate de abajo, que también falla si no hay estadísticas.
+        run: mutmut run || echo "mutmut terminó con código $?"
+      - name: Exportar resultados
+        if: always()
+        run: |
+          mkdir -p reports
+          mutmut export-cicd-stats
+          mutmut results > reports/mutmut-results.txt || true
+      - name: Quality gate (>= 70 %)
+        run: python scripts/check_mutation_score.py --umbral 70
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: mutation
+          path: |
+            backend/mutants/mutmut-cicd-stats.json
+            backend/reports/mutmut-results.txt
