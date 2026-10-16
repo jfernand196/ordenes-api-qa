@@ -15,8 +15,8 @@ Hexagonal ligera. El dominio no importa nada de FastAPI ni de Pydantic, para que
 backend/
 ├── app/
 │   ├── domain/          estado.py, excepciones.py, maquina_estados.py, orden.py
-│   ├── application/     servicio_ordenes.py
-│   ├── infrastructure/  repositorio.py (interfaz + implementación en memoria)
+│   ├── application/     servicio_ordenes.py, puertos.py (interfaces que implementa infrastructure)
+│   ├── infrastructure/  repositorio.py (implementación en memoria del puerto)
 │   ├── api/             schemas.py, rutas.py, errores.py
 │   ├── core/            logging.py (JSON + middleware X-Request-ID)
 │   └── main.py          create_app()
@@ -80,6 +80,10 @@ Todas las respuestas de error usan `application/problem+json` (RFC 9457) con `ty
 
 ## Convenciones
 
+- **Puertos en `application/puertos.py`**: la aplicación nunca importa de `infrastructure`.
+- **`Orden` encapsulada**: propiedades de solo lectura; el estado solo cambia con `cambiar_estado()` y los productos son una tupla.
+- **`crear()` recibe `LineaProducto`**, nunca tuplas; el schema la construye con `ProductoIn.a_dominio()`.
+- **mypy en modo estricto**: `mypy app` debe pasar sin errores.
 - **Dinero en `int`** (pesos sin decimales). Nunca `float`.
 - **Nombres del dominio en español** y JSON en camelCase con `alias_generator=to_camel` (`valor_unitario` ↔ `valorUnitario`).
 - **`extra="forbid"`** en todos los schemas de entrada: si el cliente manda `total`, responde 422.

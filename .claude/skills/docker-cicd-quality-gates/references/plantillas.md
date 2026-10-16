@@ -30,7 +30,7 @@ USER appuser
 EXPOSE 8080
 HEALTHCHECK --interval=10s --timeout=3s --start-period=5s --retries=5 \
   CMD python -c "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8080/health').status == 200 else 1)"
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080"]
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080", "--no-access-log"]
 ```
 
 ### backend/.dockerignore
@@ -44,8 +44,9 @@ __pycache__
 htmlcov
 coverage.xml
 mutants
-tests
 reports
+tests
+scripts
 ```
 
 ---
@@ -107,12 +108,14 @@ concurrency:
 
 env:
   PYTHON_VERSION: "3.12"
-  NODE_VERSION: "24"
 
 jobs:
   lint:
-    name: Lint y trazabilidad
+    name: Lint
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -120,19 +123,19 @@ jobs:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: pip
           cache-dependency-path: backend/requirements-dev.txt
-      - run: pip install -r backend/requirements-dev.txt
-      - name: Ruff
-        working-directory: backend
+      - run: pip install -r requirements-dev.txt
+      - name: Ruff (errores y formato)
         run: |
           ruff check .
           ruff format --check .
-      - name: Matriz de trazabilidad
+      - name: Trazabilidad (todas las reglas con pruebas y matriz al día)
+        working-directory: .
         run: |
           python scripts/generar_trazabilidad.py --salida docs/TRACEABILITY.md --estricto
+          git diff --exit-code docs/TRACEABILITY.md || { echo "::error::docs/TRACEABILITY.md está desactualizado. Ejecuta scripts/generar_trazabilidad.py y haz commit."; exit 1; }
           cat docs/TRACEABILITY.md >> "$GITHUB_STEP_SUMMARY"
-
   unit-tests:
-    name: Pruebas unitarias y cobertura
+    name: Pruebas unitarias e integración con cobertura
     needs: lint
     runs-on: ubuntu-latest
     defaults:
@@ -146,7 +149,7 @@ jobs:
           cache: pip
           cache-dependency-path: backend/requirements-dev.txt
       - run: pip install -r requirements-dev.txt
-      - name: Pytest con cobertura (gate >= 80 %)
+      - name: Pytest con cobertura (quality gate >= 80 %)
         run: >
           pytest --cov=app --cov-branch
           --cov-report=term-missing --cov-report=xml --cov-report=html
@@ -164,9 +167,8 @@ jobs:
             backend/htmlcov
             backend/coverage.xml
             backend/reports/junit.xml
-
   mutation:
-    name: Mutation testing
+    name: Mutation testing (quality gate >= 70 %)
     needs: unit-tests
     runs-on: ubuntu-latest
     defaults:
@@ -181,8 +183,7 @@ jobs:
           cache-dependency-path: backend/requirements-dev.txt
       - run: pip install -r requirements-dev.txt
       - name: Ejecutar mutmut
-        # El código de salida de mutmut puede ser distinto de 0 cuando hay sobrevivientes;
-        # quien decide es el quality gate de abajo, que además falla si no hay estadísticas.
+        # Quien decide es el quality gate de abajo, que también falla si no hay estadísticas.
         run: mutmut run || echo "mutmut terminó con código $?"
       - name: Exportar resultados
         if: always()
@@ -199,25 +200,29 @@ jobs:
           path: |
             backend/mutants/mutmut-cicd-stats.json
             backend/reports/mutmut-results.txt
-
   docker-build:
     name: Construcción de imagen Docker
     needs: unit-tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Build de la API
+      - name: Build de la imagen (comando del enunciado)
         run: docker build -t challenge-api:${{ github.sha }} ./backend
-      - name: Prueba de humo del contenedor
+      - name: Prueba de humo con docker compose
         run: |
-          docker run -d --name api -p 8080:8080 challenge-api:${{ github.sha }}
-          for i in $(seq 1 20); do
-            curl -fsS http://localhost:8080/health && exit 0
-            sleep 1
-          done
-          docker logs api
-          exit 1
-
+          docker compose up -d --build --wait
+          curl -fsS http://localhost:8080/health
+          curl -fsS -X POST http://localhost:8080/orders \
+            -H "Content-Type: application/json" \
+            -d '{"cliente":"CI","productos":[{"id":"P1","cantidad":1,"valorUnitario":1000}]}'
+          curl -fsS http://localhost:3000/ | grep -q 'id="root"'
+          curl -fsS http://localhost:3000/api/health
+      - name: Logs de la API
+        if: always()
+        run: docker compose logs api
+      - name: Apagar
+        if: always()
+        run: docker compose down
   acceptance:
     name: Pruebas de aceptación (Karate)
     needs: unit-tests
@@ -229,8 +234,8 @@ jobs:
           distribution: temurin
           java-version: "17"
           cache: maven
-      - name: Levantar API
-        run: docker compose up -d --build --wait api
+      - name: Levantar la API
+        run: docker compose up -d --build --wait
       - name: Karate
         run: mvn -B test -f acceptance-tests/pom.xml -DbaseUrl=http://localhost:8080
       - name: Logs de la API
@@ -245,11 +250,12 @@ jobs:
           path: |
             acceptance-tests/target/karate-reports
             reports/api-karate.log
-      - if: always()
+      - name: Apagar
+        if: always()
         run: docker compose down
 
   frontend:
-    name: Frontend (Vitest y build)
+    name: Frontend (tipos, pruebas y build)
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -258,27 +264,28 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: ${{ env.NODE_VERSION }}
+          node-version: "24"
           cache: npm
           cache-dependency-path: frontend/package-lock.json
       - run: npm ci
+      - run: npm run typecheck
       - run: npm test -- --run
       - run: npm run build
 
   e2e:
     name: Pruebas E2E (Playwright)
-    needs: [frontend, acceptance]
+    needs: [frontend, unit-tests]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: ${{ env.NODE_VERSION }}
+          node-version: "24"
           cache: npm
           cache-dependency-path: frontend/package-lock.json
       - name: Levantar API y web
         run: docker compose up -d --build --wait
-      - name: Instalar dependencias y navegador
+      - name: Instalar dependencias y Chromium
         working-directory: frontend
         run: |
           npm ci
@@ -286,7 +293,7 @@ jobs:
       - name: Playwright
         working-directory: frontend
         run: npx playwright test
-      - name: Logs
+      - name: Logs de la API y la web
         if: always()
         run: |
           mkdir -p reports
@@ -299,7 +306,8 @@ jobs:
             frontend/playwright-report
             frontend/test-results
             reports/stack-e2e.log
-      - if: always()
+      - name: Apagar
+        if: always()
         run: docker compose down
 ```
 

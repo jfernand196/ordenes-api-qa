@@ -24,6 +24,7 @@ Contenido:
     <artifactId>acceptance-tests</artifactId>
     <version>1.0.0</version>
     <packaging>jar</packaging>
+    <name>Pruebas de aceptación de la API de órdenes</name>
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -103,6 +104,7 @@ function fn() {
   karate.log('baseUrl =', baseUrl);
   karate.configure('connectTimeout', 5000);
   karate.configure('readTimeout', 10000);
+  // Cada escenario envía su propio X-Request-ID para cruzarlo con los logs de la API.
   karate.configure('headers', { 'X-Request-ID': 'karate-' + java.util.UUID.randomUUID() });
   return {
     baseUrl: baseUrl,
@@ -171,15 +173,17 @@ Feature: Crear órdenes de compra
         transicionesPermitidas: ['CANCELADA', 'PAGADA']
       }
       """
+    And match karate.response.header('Location') == '/orders/' + response.id
 
-  # Justificación: RN-03 exige que el total lo calcule el sistema; un total enviado
-  # por el cliente es un riesgo de manipulación de precios, por eso se rechaza.
+  # Justificación: RN-03 exige que el total lo calcule el sistema. Aceptar un total
+  # enviado por el cliente sería un riesgo de manipulación de precios.
   @RN-03
   Scenario: Rechazar una orden que trae el total desde el cliente
     Given path 'orders'
     And request { cliente: 'Ana', productos: [{ id: 'P001', cantidad: 1, valorUnitario: 1000 }], total: 1 }
     When method post
     Then status 422
+    And match response.errores contains { campo: 'total', mensaje: 'Campo no permitido.' }
 
   # Justificación: RN-01 y RN-02 son la primera barrera de calidad de datos; se
   # verifican también contra la API desplegada, no solo en pruebas unitarias.
@@ -190,14 +194,15 @@ Feature: Crear órdenes de compra
     When method post
     Then status 422
     And match karate.response.header('Content-Type') contains 'application/problem+json'
-    And match response.status == 422
+    And match response.codigo == 'VALIDACION'
+    And match response.errores[0].campo == '<campo>'
 
     Examples:
-      | caso                 | payload                                                                          |
-      | sin productos        | { cliente: 'Ana', productos: [] }                                                |
-      | cantidad cero        | { cliente: 'Ana', productos: [{ id: 'P1', cantidad: 0, valorUnitario: 1000 }] }  |
-      | cantidad negativa    | { cliente: 'Ana', productos: [{ id: 'P1', cantidad: -1, valorUnitario: 1000 }] } |
-      | sin cliente          | { productos: [{ id: 'P1', cantidad: 1, valorUnitario: 1000 }] }                  |
+      | caso              | campo                | payload                                                                          |
+      | sin productos     | productos            | { cliente: 'Ana', productos: [] }                                                |
+      | cantidad cero     | productos.0.cantidad | { cliente: 'Ana', productos: [{ id: 'P1', cantidad: 0, valorUnitario: 1000 }] }  |
+      | cantidad negativa | productos.0.cantidad | { cliente: 'Ana', productos: [{ id: 'P1', cantidad: -1, valorUnitario: 1000 }] } |
+      | sin cliente       | cliente              | { productos: [{ id: 'P1', cantidad: 1, valorUnitario: 1000 }] }                  |
 ```
 
 ---
@@ -258,6 +263,7 @@ Feature: Transiciones de estado de una orden
     Then status 400
     And match karate.response.header('Content-Type') contains 'application/problem+json'
     And match response.codigo == 'RN-05'
+    And match response.detail == 'La orden no puede enviarse si no ha sido pagada.'
 
   @RN-04
   Scenario: Intentar cancelar una orden entregada
@@ -282,7 +288,7 @@ Feature: Transiciones de estado de una orden
     And match response.estado == 'ENTREGADA'
     And match response.transicionesPermitidas == []
 
-  # Justificación: saltarse estados (CREADA → ENTREGADA) es la transición inválida
+  # Justificación: saltarse estados (CREADA a ENTREGADA) es la transición inválida
   # de mayor impacto: entregaría mercancía sin pago ni envío registrados.
   @RN-06
   Scenario: Rechazar una transición que se salta estados
@@ -291,6 +297,17 @@ Feature: Transiciones de estado de una orden
     When method patch
     Then status 409
     And match response.codigo == 'RN-06'
+
+  # Justificación: supuesto documentado. RN-04 solo prohíbe cancelar una orden
+  # ENTREGADA, así que una ENVIADA sí puede cancelarse.
+  @RN-04
+  Scenario: Cancelar una orden enviada
+    * call read(cambiarEstado) { id: '#(ordenId)', estado: 'PAGADA' }
+    * call read(cambiarEstado) { id: '#(ordenId)', estado: 'ENVIADA' }
+    Given path 'orders', ordenId
+    When method delete
+    Then status 200
+    And match response.estado == 'CANCELADA'
 
   Scenario: Cancelar una orden creada
     Given path 'orders', ordenId

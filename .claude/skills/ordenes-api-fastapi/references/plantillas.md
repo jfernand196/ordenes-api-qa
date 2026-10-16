@@ -27,10 +27,11 @@ pydantic>=2.8,<3
 -r requirements.txt
 pytest>=8.2
 pytest-cov>=5.0
-httpx>=0.27
+httpx2>=2.4,<3
 hypothesis>=6.100
 mutmut>=3.2
 ruff>=0.5
+mypy>=1.10
 ```
 
 ---
@@ -96,7 +97,7 @@ from app.domain.excepciones import (
 TRANSICIONES: dict[Estado, frozenset[Estado]] = {
     Estado.CREADA: frozenset({Estado.PAGADA, Estado.CANCELADA}),
     Estado.PAGADA: frozenset({Estado.ENVIADA, Estado.CANCELADA}),
-    # Supuesto documentado: RN-04 solo prohíbe cancelar una orden ENTREGADA.
+    # Supuesto documentado: RN-04 solo prohibe cancelar una orden ENTREGADA.
     Estado.ENVIADA: frozenset({Estado.ENTREGADA, Estado.CANCELADA}),
     Estado.ENTREGADA: frozenset(),
     Estado.CANCELADA: frozenset(),
@@ -108,7 +109,7 @@ def transiciones_permitidas(desde: Estado) -> list[Estado]:
 
 
 def validar_transicion(desde: Estado, hacia: Estado) -> None:
-    """Lanza la excepción de dominio que corresponde. El orden de las validaciones importa."""
+    """Lanza la excepcion de dominio que corresponde. El orden de las validaciones importa."""
     if not TRANSICIONES[desde]:
         raise EstadoTerminalError(
             f"La orden está en estado {desde} y no admite cambios (intento: {hacia})."
@@ -121,7 +122,8 @@ def validar_transicion(desde: Estado, hacia: Estado) -> None:
 
 ### app/domain/orden.py
 ```python
-from dataclasses import dataclass, field
+from collections.abc import Iterable
+from dataclasses import dataclass
 from uuid import UUID, uuid4
 
 from app.domain.estado import Estado
@@ -152,32 +154,53 @@ class LineaProducto:
         return self.cantidad * self.valor_unitario
 
 
-@dataclass
 class Orden:
-    cliente: str
-    productos: list[LineaProducto]
-    id: UUID = field(default_factory=uuid4)
-    estado: Estado = Estado.CREADA
+    """Raíz del agregado. Sus datos solo se leen; el estado solo cambia con cambiar_estado().
 
-    def __post_init__(self) -> None:
-        if not self.cliente.strip():
+    Asi nadie puede saltarse la máquina de estados (orden.estado = ...) ni vaciar
+    los productos después de creada la orden (RN-01).
+    """
+
+    def __init__(self, cliente: str, productos: Iterable[LineaProducto]) -> None:
+        lineas = tuple(productos)  # copia inmutable: cambios a la lista original no la afectan
+        if not cliente.strip():
             raise ValidacionOrdenError("El cliente es obligatorio.")
-        if not self.productos:
+        if not lineas:
             raise ValidacionOrdenError("La orden debe contener al menos un producto.", "RN-01")
+        self._id = uuid4()
+        self._cliente = cliente
+        self._productos = lineas
+        self._estado = Estado.CREADA
+
+    @property
+    def id(self) -> UUID:
+        return self._id
+
+    @property
+    def cliente(self) -> str:
+        return self._cliente
+
+    @property
+    def productos(self) -> tuple[LineaProducto, ...]:
+        return self._productos
+
+    @property
+    def estado(self) -> Estado:
+        return self._estado
 
     @property
     def total(self) -> int:  # RN-03
-        return sum(p.subtotal for p in self.productos)
+        return sum(p.subtotal for p in self._productos)
 
     @property
     def transiciones_permitidas(self) -> list[Estado]:
-        return transiciones_permitidas(self.estado)
+        return transiciones_permitidas(self._estado)
 
     def cambiar_estado(self, nuevo: Estado) -> Estado:
         """Aplica la transición y devuelve el estado anterior (útil para el log)."""
-        validar_transicion(self.estado, nuevo)
-        anterior = self.estado
-        self.estado = nuevo
+        validar_transicion(self._estado, nuevo)
+        anterior = self._estado
+        self._estado = nuevo
         return anterior
 
     def cancelar(self) -> Estado:
@@ -188,9 +211,14 @@ class Orden:
 
 ## 3. Repositorio
 
-### app/infrastructure/repositorio.py
+### app/application/puertos.py
 ```python
-from threading import Lock
+"""Puertos de la capa de aplicación: lo que la aplicación necesita del exterior.
+
+La infraestructura los implementa; la aplicación nunca importa de la infraestructura
+(inversión de dependencias, ADR-001).
+"""
+
 from typing import Protocol
 from uuid import UUID
 
@@ -198,14 +226,28 @@ from app.domain.estado import Estado
 from app.domain.orden import Orden
 
 
-class OrderRepository(Protocol):
+class RepositorioOrdenes(Protocol):
     def guardar(self, orden: Orden) -> None: ...
     def obtener(self, orden_id: UUID) -> Orden | None: ...
     def listar(self, estado: Estado | None, limit: int, offset: int) -> list[Orden]: ...
+```
+
+### app/infrastructure/repositorio.py
+```python
+from threading import Lock
+from uuid import UUID
+
+from app.domain.estado import Estado
+from app.domain.orden import Orden
 
 
 class RepositorioEnMemoria:
-    """Persistencia en memoria (ADR-002). Thread-safe para el servidor ASGI."""
+    """Implementación en memoria del puerto RepositorioOrdenes (ADR-002).
+
+    Cumple el puerto por estructura (Protocol), sin importarlo: la infraestructura
+    depende del dominio y la aplicación no depende de la infraestructura.
+    Thread-safe para el servidor ASGI.
+    """
 
     def __init__(self) -> None:
         self._ordenes: dict[UUID, Orden] = {}
@@ -237,21 +279,23 @@ class RepositorioEnMemoria:
 import logging
 from uuid import UUID
 
+from app.application.puertos import RepositorioOrdenes
 from app.domain.estado import Estado
 from app.domain.excepciones import OrdenNoEncontradaError
 from app.domain.orden import LineaProducto, Orden
-from app.infrastructure.repositorio import OrderRepository
 
 logger = logging.getLogger("ordenes")
 
+LIMITE_POR_DEFECTO = 50
+LIMITE_MAXIMO = 100
+
 
 class ServicioOrdenes:
-    def __init__(self, repositorio: OrderRepository) -> None:
+    def __init__(self, repositorio: RepositorioOrdenes) -> None:
         self._repo = repositorio
 
-    def crear(self, cliente: str, productos: list[tuple[str, int, int]]) -> Orden:
-        lineas = [LineaProducto(id=i, cantidad=c, valor_unitario=v) for i, c, v in productos]
-        orden = Orden(cliente=cliente, productos=lineas)
+    def crear(self, cliente: str, productos: list[LineaProducto]) -> Orden:
+        orden = Orden(cliente=cliente, productos=productos)
         self._repo.guardar(orden)
         logger.info("orden_creada", extra={"orden_id": str(orden.id), "total": orden.total})
         return orden
@@ -262,7 +306,9 @@ class ServicioOrdenes:
             raise OrdenNoEncontradaError(f"No existe una orden con id {orden_id}.")
         return orden
 
-    def listar(self, estado: Estado | None = None, limit: int = 50, offset: int = 0) -> list[Orden]:
+    def listar(
+        self, estado: Estado | None = None, limit: int = LIMITE_POR_DEFECTO, offset: int = 0
+    ) -> list[Orden]:
         return self._repo.listar(estado, limit, offset)
 
     def cambiar_estado(self, orden_id: UUID, nuevo: Estado) -> Orden:
@@ -291,7 +337,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from pydantic.alias_generators import to_camel
 
 from app.domain.estado import Estado
-from app.domain.orden import Orden
+from app.domain.orden import LineaProducto, Orden
 
 
 class Base(BaseModel):
@@ -306,6 +352,9 @@ class ProductoIn(Entrada):
     id: str = Field(min_length=1, examples=["P001"])
     cantidad: int = Field(gt=0, examples=[2])  # RN-02
     valor_unitario: int = Field(gt=0, examples=[100000])
+
+    def a_dominio(self) -> LineaProducto:
+        return LineaProducto(id=self.id, cantidad=self.cantidad, valor_unitario=self.valor_unitario)
 
 
 class OrdenIn(Entrada):
@@ -348,9 +397,12 @@ class OrdenOut(Base):
 
 ### app/api/errores.py
 ```python
+from typing import Any, cast
+
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from starlette.types import ExceptionHandler
 
 from app.domain.excepciones import (
     EstadoTerminalError,
@@ -369,28 +421,6 @@ ESTADOS_HTTP: dict[type[OrdenError], tuple[int, str]] = {
     OrdenNoEncontradaError: (404, "Orden no encontrada"),
 }
 
-
-def problema(request: Request, status: int, title: str, detail: str, codigo: str, **extra) -> JSONResponse:
-    contenido = {
-        "type": f"https://errores.ordenes.local/{codigo.lower()}",
-        "title": title,
-        "status": status,
-        "detail": detail,
-        "instance": request.url.path,
-        "codigo": codigo,
-        **extra,
-    }
-    return JSONResponse(status_code=status, content=contenido, media_type="application/problem+json")
-
-
-async def manejar_orden_error(request: Request, exc: OrdenError) -> JSONResponse:
-    for clase in type(exc).__mro__:
-        if clase in ESTADOS_HTTP:
-            status, title = ESTADOS_HTTP[clase]
-            return problema(request, status, title, exc.mensaje, exc.codigo)
-    return problema(request, 500, "Error de dominio no mapeado", exc.mensaje, exc.codigo)
-
-
 # Pydantic devuelve mensajes en inglés; el contrato de la API es en español.
 MENSAJES = {
     "missing": "Es obligatorio.",
@@ -406,88 +436,144 @@ MENSAJES = {
 ORIGENES = {"body", "query", "path"}
 
 
-def traducir(error: dict) -> str:
+def problema(
+    request: Request, status: int, title: str, detail: str, codigo: str, **extra: object
+) -> JSONResponse:
+    """Respuesta de error en formato Problem Details (RFC 9457)."""
+    contenido = {
+        "type": f"https://errores.ordenes.local/{codigo.lower()}",
+        "title": title,
+        "status": status,
+        "detail": detail,
+        "instance": request.url.path,
+        "codigo": codigo,
+        **extra,
+    }
+    return JSONResponse(
+        status_code=status, content=contenido, media_type="application/problem+json"
+    )
+
+
+def traducir(error: dict[str, Any]) -> str:
     plantilla = MENSAJES.get(error["type"])
     if plantilla is None:
-        return error["msg"]
+        return str(error["msg"])
     try:
         return plantilla.format(**error.get("ctx", {}))
     except (KeyError, IndexError):
-        return error["msg"]
+        return str(error["msg"])
 
 
-def nombre_campo(loc: tuple) -> str:
+def nombre_campo(loc: tuple[int | str, ...]) -> str:
     """("body", "productos", 0, "cantidad") -> "productos.0.cantidad"."""
     partes = loc[1:] if loc and loc[0] in ORIGENES else loc
     return ".".join(str(p) for p in partes)
 
 
+async def manejar_orden_error(request: Request, exc: OrdenError) -> JSONResponse:
+    for clase in type(exc).__mro__:
+        if clase in ESTADOS_HTTP:
+            status, title = ESTADOS_HTTP[clase]
+            return problema(request, status, title, exc.mensaje, exc.codigo)
+    return problema(request, 500, "Error de dominio no mapeado", exc.mensaje, exc.codigo)
+
+
 async def manejar_validacion(request: Request, exc: RequestValidationError) -> JSONResponse:
     errores = [{"campo": nombre_campo(e["loc"]), "mensaje": traducir(e)} for e in exc.errors()]
     return problema(
-        request, 422, "Solicitud inválida", "El cuerpo o los parámetros no son válidos.",
-        "VALIDACION", errores=errores,
+        request,
+        422,
+        "Solicitud inválida",
+        "El cuerpo o los parámetros no son válidos.",
+        "VALIDACION",
+        errores=errores,
     )
 
 
 def registrar_manejadores(app: FastAPI) -> None:
-    app.add_exception_handler(OrdenError, manejar_orden_error)
-    app.add_exception_handler(RequestValidationError, manejar_validacion)
+    # Starlette declara que los manejadores reciben cualquier Exception; en la práctica
+    # cada uno recibe solo el tipo con el que se registra, así que la conversión es segura.
+    app.add_exception_handler(OrdenError, cast(ExceptionHandler, manejar_orden_error))
+    app.add_exception_handler(RequestValidationError, cast(ExceptionHandler, manejar_validacion))
 ```
 
 ### app/api/rutas.py
 ```python
+from typing import Annotated, Any, cast
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query, Request, Response, status
 
 from app.api.schemas import CambioEstadoIn, OrdenIn, OrdenOut
-from app.application.servicio_ordenes import ServicioOrdenes
+from app.application.servicio_ordenes import (
+    LIMITE_MAXIMO,
+    LIMITE_POR_DEFECTO,
+    ServicioOrdenes,
+)
 from app.domain.estado import Estado
 
 router = APIRouter(prefix="/orders", tags=["órdenes"])
 
+# Documentación de errores para OpenAPI: cada código con la regla que lo produce.
+RESPUESTAS: dict[int, dict[str, Any]] = {
+    400: {"description": "La orden no ha sido pagada (RN-05)"},
+    404: {"description": "La orden no existe"},
+    409: {"description": "Estado terminal (RN-04) o transición inválida (RN-06)"},
+    422: {"description": "Datos inválidos (RN-01, RN-02, total enviado o formato)"},
+}
+
+
+def respuestas(*codigos: int) -> dict[int | str, dict[str, Any]]:
+    return {codigo: RESPUESTAS[codigo] for codigo in codigos}
+
 
 def obtener_servicio(request: Request) -> ServicioOrdenes:
-    return request.app.state.servicio
+    # app.state no tiene tipos: create_app() garantiza que aquí hay un ServicioOrdenes.
+    return cast(ServicioOrdenes, request.app.state.servicio)
 
 
-@router.post("", response_model=OrdenOut, status_code=status.HTTP_201_CREATED)
-def crear_orden(
-    datos: OrdenIn, response: Response, servicio: ServicioOrdenes = Depends(obtener_servicio)
-) -> OrdenOut:
-    orden = servicio.crear(
-        datos.cliente, [(p.id, p.cantidad, p.valor_unitario) for p in datos.productos]
-    )
-    # REST: un 201 indica dónde quedó el recurso creado. Ruta relativa para que funcione detrás de nginx.
+Servicio = Annotated[ServicioOrdenes, Depends(obtener_servicio)]
+
+
+@router.post(
+    "", response_model=OrdenOut, status_code=status.HTTP_201_CREATED, responses=respuestas(422)
+)
+def crear_orden(datos: OrdenIn, response: Response, servicio: Servicio) -> OrdenOut:
+    """Crea una orden en estado CREADA. El total se calcula automáticamente (RN-03)."""
+    orden = servicio.crear(datos.cliente, [p.a_dominio() for p in datos.productos])
+    # REST: un 201 indica dónde quedó el recurso; ruta relativa para que funcione tras nginx.
     response.headers["Location"] = f"{router.prefix}/{orden.id}"
     return OrdenOut.desde_dominio(orden)
 
 
-@router.get("", response_model=list[OrdenOut])
+@router.get("", response_model=list[OrdenOut], responses=respuestas(422))
 def listar_ordenes(
+    servicio: Servicio,
     estado: Estado | None = None,
-    limit: int = Query(50, ge=1, le=100),
-    offset: int = Query(0, ge=0),
-    servicio: ServicioOrdenes = Depends(obtener_servicio),
+    limit: Annotated[int, Query(ge=1, le=LIMITE_MAXIMO)] = LIMITE_POR_DEFECTO,
+    offset: Annotated[int, Query(ge=0)] = 0,
 ) -> list[OrdenOut]:
+    """Lista las órdenes, más recientes primero, con filtro opcional por estado."""
     return [OrdenOut.desde_dominio(o) for o in servicio.listar(estado, limit, offset)]
 
 
-@router.get("/{orden_id}", response_model=OrdenOut)
-def consultar_orden(orden_id: UUID, servicio: ServicioOrdenes = Depends(obtener_servicio)) -> OrdenOut:
+@router.get("/{orden_id}", response_model=OrdenOut, responses=respuestas(404, 422))
+def consultar_orden(orden_id: UUID, servicio: Servicio) -> OrdenOut:
+    """Consulta una orden por su id."""
     return OrdenOut.desde_dominio(servicio.obtener(orden_id))
 
 
-@router.patch("/{orden_id}/status", response_model=OrdenOut)
-def actualizar_estado(
-    orden_id: UUID, datos: CambioEstadoIn, servicio: ServicioOrdenes = Depends(obtener_servicio)
-) -> OrdenOut:
+@router.patch(
+    "/{orden_id}/status", response_model=OrdenOut, responses=respuestas(400, 404, 409, 422)
+)
+def actualizar_estado(orden_id: UUID, datos: CambioEstadoIn, servicio: Servicio) -> OrdenOut:
+    """Cambia el estado de la orden respetando la máquina de estados (RN-04, RN-05, RN-06)."""
     return OrdenOut.desde_dominio(servicio.cambiar_estado(orden_id, datos.estado))
 
 
-@router.delete("/{orden_id}", response_model=OrdenOut)
-def cancelar_orden(orden_id: UUID, servicio: ServicioOrdenes = Depends(obtener_servicio)) -> OrdenOut:
+@router.delete("/{orden_id}", response_model=OrdenOut, responses=respuestas(404, 409, 422))
+def cancelar_orden(orden_id: UUID, servicio: Servicio) -> OrdenOut:
+    """Cancelación lógica: la orden pasa a CANCELADA y se conserva (es un registro auditable)."""
     return OrdenOut.desde_dominio(servicio.cancelar(orden_id))
 ```
 
@@ -503,10 +589,11 @@ import json
 import logging
 import sys
 import time
+from collections.abc import Awaitable, Callable
 from contextvars import ContextVar
 from uuid import uuid4
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Response
 
 request_id_actual: ContextVar[str] = ContextVar("request_id", default="-")
 CAMPOS_EXTRA = ("orden_id", "desde", "hacia", "total", "metodo", "ruta", "status", "duracion_ms")
@@ -514,7 +601,7 @@ CAMPOS_EXTRA = ("orden_id", "desde", "hacia", "total", "metodo", "ruta", "status
 
 class FormatoJson(logging.Formatter):
     def format(self, record: logging.LogRecord) -> str:
-        datos = {
+        datos: dict[str, object] = {
             "nivel": record.levelname,
             "logger": record.name,
             "mensaje": record.getMessage(),
@@ -522,7 +609,9 @@ class FormatoJson(logging.Formatter):
         }
         for campo in CAMPOS_EXTRA:
             if hasattr(record, campo):
-                datos[campo] = str(getattr(record, campo))
+                valor = getattr(record, campo)
+                # Números como números para poder filtrarlos; el resto, como texto.
+                datos[campo] = valor if isinstance(valor, int | float) else str(valor)
         return json.dumps(datos, ensure_ascii=False)
 
 
@@ -538,7 +627,9 @@ def registrar_middleware(app: FastAPI) -> None:
     logger = logging.getLogger("http")
 
     @app.middleware("http")
-    async def request_id(request: Request, call_next):
+    async def request_id(
+        request: Request, call_next: Callable[[Request], Awaitable[Response]]
+    ) -> Response:
         rid = request.headers.get("X-Request-ID") or str(uuid4())
         token = request_id_actual.set(rid)
         inicio = time.perf_counter()
@@ -565,6 +656,8 @@ def registrar_middleware(app: FastAPI) -> None:
 
 ### app/main.py
 ```python
+import os
+
 from fastapi import FastAPI
 
 from app.api.errores import registrar_manejadores
@@ -575,7 +668,7 @@ from app.infrastructure.repositorio import RepositorioEnMemoria
 
 
 def create_app() -> FastAPI:
-    configurar_logging()
+    configurar_logging(os.getenv("LOG_LEVEL", "INFO"))
     app = FastAPI(
         title="API de órdenes de compra",
         version="1.0.0",

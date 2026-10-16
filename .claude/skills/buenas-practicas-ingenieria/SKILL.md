@@ -52,9 +52,9 @@ Los evaluadores valoran "legibilidad y mantenibilidad del código" y "capacidad 
 |---|---|---|
 | **S** Responsabilidad única | Una razón para cambiar por módulo | `rutas.py` traduce HTTP, `servicio_ordenes.py` orquesta, `orden.py` aplica reglas, `repositorio.py` guarda |
 | **O** Abierto/cerrado | Extender sin modificar | Nueva transición: una línea en `TRANSICIONES`. Nuevo error: una entrada en `ESTADOS_HTTP`; el handler no cambia |
-| **L** Sustitución de Liskov | Un subtipo debe poder usarse donde se espera el tipo base | Toda excepción hereda de `OrdenError` y el handler la trata igual; cualquier repositorio que cumpla `OrderRepository` sirve |
-| **I** Segregación de interfaces | Interfaces pequeñas y específicas | `OrderRepository` tiene solo `guardar`, `obtener` y `listar` |
-| **D** Inversión de dependencias | Depender de abstracciones | `ServicioOrdenes` recibe un `OrderRepository` (Protocol); `create_app()` inyecta la implementación en memoria |
+| **L** Sustitución de Liskov | Un subtipo debe poder usarse donde se espera el tipo base | Toda excepción hereda de `OrdenError` y el handler la trata igual; cualquier repositorio que cumpla `RepositorioOrdenes` sirve |
+| **I** Segregación de interfaces | Interfaces pequeñas y específicas | `RepositorioOrdenes` tiene solo `guardar`, `obtener` y `listar` |
+| **D** Inversión de dependencias | Depender de abstracciones | `ServicioOrdenes` recibe un `RepositorioOrdenes` (Protocol); `create_app()` inyecta la implementación en memoria |
 
 En el frontend: componentes de presentación que solo reciben props (S), hooks de datos como `useOrden` que encapsulan el acceso a la API (D), y el cliente `ordenesApi` como única puerta a HTTP.
 

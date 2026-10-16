@@ -2,10 +2,11 @@ import json
 import logging
 import sys
 import time
+from collections.abc import Awaitable, Callable
 from contextvars import ContextVar
 from uuid import uuid4
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Response
 
 request_id_actual: ContextVar[str] = ContextVar("request_id", default="-")
 CAMPOS_EXTRA = ("orden_id", "desde", "hacia", "total", "metodo", "ruta", "status", "duracion_ms")
@@ -13,7 +14,7 @@ CAMPOS_EXTRA = ("orden_id", "desde", "hacia", "total", "metodo", "ruta", "status
 
 class FormatoJson(logging.Formatter):
     def format(self, record: logging.LogRecord) -> str:
-        datos = {
+        datos: dict[str, object] = {
             "nivel": record.levelname,
             "logger": record.name,
             "mensaje": record.getMessage(),
@@ -39,7 +40,9 @@ def registrar_middleware(app: FastAPI) -> None:
     logger = logging.getLogger("http")
 
     @app.middleware("http")
-    async def request_id(request: Request, call_next):
+    async def request_id(
+        request: Request, call_next: Callable[[Request], Awaitable[Response]]
+    ) -> Response:
         rid = request.headers.get("X-Request-ID") or str(uuid4())
         token = request_id_actual.set(rid)
         inicio = time.perf_counter()

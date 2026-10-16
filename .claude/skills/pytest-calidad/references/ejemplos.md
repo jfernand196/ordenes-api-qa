@@ -33,7 +33,6 @@ source = ["app"]
 [tool.coverage.report]
 fail_under = 80
 show_missing = true
-skip_covered = false
 
 [tool.mutmut]
 source_paths = ["app/"]
@@ -46,6 +45,11 @@ target-version = "py312"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP", "SIM"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+plugins = ["pydantic.mypy"]
 ```
 
 ---
@@ -117,6 +121,8 @@ PAGO = PagoRequeridoError
 TERMINAL = EstadoTerminalError
 INVALIDA = TransicionInvalidaError
 
+# Tabla escrita a mano a proposito: si se derivara de TRANSICIONES,
+# cualquier mutante del diccionario pasaria las pruebas.
 MATRIZ = [
     (E.CREADA, E.CREADA, INVALIDA),
     (E.CREADA, E.PAGADA, OK),
@@ -149,7 +155,7 @@ MATRIZ = [
 @pytest.mark.rn("RN-04")
 @pytest.mark.rn("RN-05")
 @pytest.mark.rn("RN-06")
-@pytest.mark.parametrize(("desde", "hacia", "esperado"), MATRIZ, ids=lambda v: str(v) if v else "OK")
+@pytest.mark.parametrize(("desde", "hacia", "esperado"), MATRIZ)
 def test_matriz_de_transiciones(desde, hacia, esperado):
     if esperado is OK:
         validar_transicion(desde, hacia)
@@ -236,6 +242,10 @@ def test_valor_unitario_no_positivo_es_invalido(valor):
         linea(valor=valor)
 
 
+def test_valor_unitario_uno_es_valido():
+    assert linea(valor=1).valor_unitario == 1
+
+
 @pytest.mark.parametrize("cliente", ["", "   "])
 def test_cliente_vacio_es_invalido(cliente):
     with pytest.raises(ValidacionOrdenError):
@@ -261,9 +271,7 @@ def test_total_con_varios_productos():
 
 @pytest.mark.rn("RN-03")
 @given(
-    st.lists(
-        st.tuples(st.integers(1, 1_000), st.integers(1, 10_000_000)), min_size=1, max_size=20
-    )
+    st.lists(st.tuples(st.integers(1, 1_000), st.integers(1, 10_000_000)), min_size=1, max_size=20)
 )
 def test_total_es_la_suma_de_cantidad_por_valor(items):
     productos = [linea(c, v, f"P{i}") for i, (c, v) in enumerate(items)]
@@ -284,6 +292,37 @@ def test_cambiar_estado_devuelve_el_estado_anterior():
     orden = Orden(cliente="Ana", productos=[linea()])
     assert orden.cambiar_estado(Estado.PAGADA) == Estado.CREADA
     assert orden.estado == Estado.PAGADA
+
+
+def test_transiciones_permitidas_de_una_orden_nueva():
+    orden = Orden(cliente="Ana", productos=[linea()])
+    assert orden.transiciones_permitidas == [Estado.CANCELADA, Estado.PAGADA]
+
+
+def test_cada_orden_tiene_un_id_distinto():
+    a = Orden(cliente="Ana", productos=[linea()])
+    b = Orden(cliente="Ana", productos=[linea()])
+    assert a.id != b.id
+
+
+def test_el_estado_no_se_puede_asignar_saltandose_la_maquina_de_estados():
+    orden = Orden(cliente="Ana", productos=[linea()])
+    with pytest.raises(AttributeError):
+        orden.estado = Estado.ENTREGADA
+    assert orden.estado == Estado.CREADA
+
+
+@pytest.mark.rn("RN-01")
+def test_los_productos_no_cambian_aunque_cambie_la_lista_original():
+    lineas = [linea()]
+    orden = Orden(cliente="Ana", productos=lineas)
+    lineas.clear()
+    assert len(orden.productos) == 1
+    assert isinstance(orden.productos, tuple)
+
+
+def test_la_orden_conserva_el_cliente():
+    assert Orden(cliente="Juan Pérez", productos=[linea()]).cliente == "Juan Pérez"
 ```
 
 ---
@@ -297,7 +336,8 @@ import pytest
 
 from app.application.servicio_ordenes import ServicioOrdenes
 from app.domain.estado import Estado
-from app.domain.excepciones import OrdenNoEncontradaError
+from app.domain.excepciones import OrdenNoEncontradaError, PagoRequeridoError
+from app.domain.orden import LineaProducto
 from app.infrastructure.repositorio import RepositorioEnMemoria
 
 
@@ -307,29 +347,44 @@ def servicio() -> ServicioOrdenes:
 
 
 def test_crear_y_obtener(servicio):
-    orden = servicio.crear("Ana", [("P1", 2, 500)])
+    orden = servicio.crear("Ana", [LineaProducto("P1", 2, 500)])
     assert servicio.obtener(orden.id) is orden
     assert orden.total == 1000
 
 
 def test_obtener_inexistente_lanza_error(servicio):
-    with pytest.raises(OrdenNoEncontradaError):
+    with pytest.raises(OrdenNoEncontradaError) as exc:
         servicio.obtener(uuid4())
+    assert exc.value.codigo == "NO_ENCONTRADA"
+
+
+def test_listar_devuelve_las_mas_recientes_primero(servicio):
+    primera = servicio.crear("A", [LineaProducto("P1", 1, 10)])
+    segunda = servicio.crear("B", [LineaProducto("P1", 1, 10)])
+    assert [o.id for o in servicio.listar()] == [segunda.id, primera.id]
 
 
 def test_listar_filtra_por_estado_y_pagina(servicio):
-    a = servicio.crear("A", [("P1", 1, 10)])
-    servicio.crear("B", [("P1", 1, 10)])
+    a = servicio.crear("A", [LineaProducto("P1", 1, 10)])
+    servicio.crear("B", [LineaProducto("P1", 1, 10)])
     servicio.cambiar_estado(a.id, Estado.PAGADA)
     assert [o.id for o in servicio.listar(Estado.PAGADA)] == [a.id]
     assert len(servicio.listar()) == 2
     assert len(servicio.listar(limit=1)) == 1
-    assert len(servicio.listar(offset=1)) == 1
+    assert [o.id for o in servicio.listar(offset=1)] == [a.id]
 
 
 def test_cancelar_pasa_a_cancelada(servicio):
-    orden = servicio.crear("A", [("P1", 1, 10)])
+    orden = servicio.crear("A", [LineaProducto("P1", 1, 10)])
     assert servicio.cancelar(orden.id).estado == Estado.CANCELADA
+
+
+@pytest.mark.rn("RN-05")
+def test_una_transicion_rechazada_no_cambia_la_orden_guardada(servicio):
+    orden = servicio.crear("A", [LineaProducto("P1", 1, 10)])
+    with pytest.raises(PagoRequeridoError):
+        servicio.cambiar_estado(orden.id, Estado.ENVIADA)
+    assert servicio.obtener(orden.id).estado == Estado.CREADA
 ```
 
 ---
@@ -349,15 +404,22 @@ def test_crear_orden_valida_responde_201(cliente, payload_valido):
     cuerpo = r.json()
     assert cuerpo["total"] == 200000
     assert cuerpo["estado"] == "CREADA"
+    assert cuerpo["productos"] == [{"id": "P001", "cantidad": 2, "valorUnitario": 100000}]
     assert cuerpo["transicionesPermitidas"] == ["CANCELADA", "PAGADA"]
     assert r.headers["Location"] == f"/orders/{cuerpo['id']}"
-    assert "X-Request-ID" in r.headers
+
+
+def test_toda_respuesta_trae_x_request_id(cliente):
+    r = cliente.get("/health", headers={"X-Request-ID": "prueba-123"})
+    assert r.headers["X-Request-ID"] == "prueba-123"
+    assert cliente.get("/health").headers["X-Request-ID"]
 
 
 @pytest.mark.rn("RN-03")
 def test_no_se_acepta_un_total_enviado_por_el_cliente(cliente, payload_valido):
     r = cliente.post("/orders", json={**payload_valido, "total": 1})
     assert r.status_code == 422
+    assert r.json()["errores"] == [{"campo": "total", "mensaje": "Campo no permitido."}]
 
 
 @pytest.mark.rn("RN-01")
@@ -365,7 +427,11 @@ def test_crear_orden_sin_productos_responde_422(cliente):
     r = cliente.post("/orders", json={"cliente": "Ana", "productos": []})
     assert r.status_code == 422
     assert r.headers["content-type"].startswith(PROBLEM)
-    assert r.json()["codigo"] == "VALIDACION"
+    cuerpo = r.json()
+    assert cuerpo["codigo"] == "VALIDACION"
+    assert cuerpo["errores"] == [
+        {"campo": "productos", "mensaje": "Debe tener al menos 1 elemento(s)."}
+    ]
 
 
 @pytest.mark.rn("RN-02")
@@ -380,6 +446,12 @@ def test_crear_orden_con_cantidad_cero_responde_422(cliente):
     ]
 
 
+def test_cliente_solo_con_espacios_lo_rechaza_el_dominio(cliente, payload_valido):
+    r = cliente.post("/orders", json={**payload_valido, "cliente": "   "})
+    assert r.status_code == 422
+    assert r.json()["codigo"] == "VALIDACION"
+
+
 def test_consultar_orden_existente_responde_200(cliente, crear_orden):
     orden = crear_orden()
     r = cliente.get(f"/orders/{orden['id']}")
@@ -390,7 +462,14 @@ def test_consultar_orden_existente_responde_200(cliente, crear_orden):
 def test_consultar_orden_inexistente_responde_404(cliente):
     r = cliente.get("/orders/00000000-0000-0000-0000-000000000000")
     assert r.status_code == 404
+    assert r.headers["content-type"].startswith(PROBLEM)
     assert r.json()["codigo"] == "NO_ENCONTRADA"
+
+
+def test_id_que_no_es_uuid_responde_422(cliente):
+    r = cliente.get("/orders/no-es-un-uuid")
+    assert r.status_code == 422
+    assert r.json()["errores"][0]["campo"] == "orden_id"
 
 
 def test_listar_ordenes_con_filtro(cliente, crear_orden, llevar_a):
@@ -400,6 +479,16 @@ def test_listar_ordenes_con_filtro(cliente, crear_orden, llevar_a):
     r = cliente.get("/orders", params={"estado": "PAGADA"})
     assert r.status_code == 200
     assert [o["id"] for o in r.json()] == [pagada["id"]]
+
+
+@pytest.mark.parametrize(
+    ("parametros", "campo"),
+    [({"limit": 0}, "limit"), ({"limit": 101}, "limit"), ({"offset": -1}, "offset")],
+)
+def test_paginacion_invalida_responde_422(cliente, parametros, campo):
+    r = cliente.get("/orders", params=parametros)
+    assert r.status_code == 422
+    assert r.json()["errores"][0]["campo"] == campo
 
 
 @pytest.mark.rn("RN-05")
@@ -428,6 +517,13 @@ def test_transicion_invalida_responde_409(cliente, crear_orden):
     assert r.json()["codigo"] == "RN-06"
 
 
+def test_ciclo_completo_hasta_entregada(cliente, crear_orden, llevar_a):
+    orden = crear_orden()
+    final = llevar_a(orden["id"], "PAGADA", "ENVIADA", "ENTREGADA")
+    assert final["estado"] == "ENTREGADA"
+    assert final["transicionesPermitidas"] == []
+
+
 def test_cancelar_orden_creada_responde_200(cliente, crear_orden):
     orden = crear_orden()
     r = cliente.delete(f"/orders/{orden['id']}")
@@ -439,6 +535,7 @@ def test_estado_desconocido_responde_422(cliente, crear_orden):
     orden = crear_orden()
     r = cliente.patch(f"/orders/{orden['id']}/status", json={"estado": "PERDIDA"})
     assert r.status_code == 422
+    assert r.json()["errores"][0]["campo"] == "estado"
 
 
 def test_health(cliente):

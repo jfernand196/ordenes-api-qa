@@ -1,6 +1,9 @@
+from typing import Any, cast
+
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from starlette.types import ExceptionHandler
 
 from app.domain.excepciones import (
     EstadoTerminalError,
@@ -35,7 +38,7 @@ ORIGENES = {"body", "query", "path"}
 
 
 def problema(
-    request: Request, status: int, title: str, detail: str, codigo: str, **extra
+    request: Request, status: int, title: str, detail: str, codigo: str, **extra: object
 ) -> JSONResponse:
     """Respuesta de error en formato Problem Details (RFC 9457)."""
     contenido = {
@@ -52,17 +55,17 @@ def problema(
     )
 
 
-def traducir(error: dict) -> str:
+def traducir(error: dict[str, Any]) -> str:
     plantilla = MENSAJES.get(error["type"])
     if plantilla is None:
-        return error["msg"]
+        return str(error["msg"])
     try:
         return plantilla.format(**error.get("ctx", {}))
     except (KeyError, IndexError):
-        return error["msg"]
+        return str(error["msg"])
 
 
-def nombre_campo(loc: tuple) -> str:
+def nombre_campo(loc: tuple[int | str, ...]) -> str:
     """("body", "productos", 0, "cantidad") -> "productos.0.cantidad"."""
     partes = loc[1:] if loc and loc[0] in ORIGENES else loc
     return ".".join(str(p) for p in partes)
@@ -89,5 +92,7 @@ async def manejar_validacion(request: Request, exc: RequestValidationError) -> J
 
 
 def registrar_manejadores(app: FastAPI) -> None:
-    app.add_exception_handler(OrdenError, manejar_orden_error)
-    app.add_exception_handler(RequestValidationError, manejar_validacion)
+    # Starlette declara que los manejadores reciben cualquier Exception; en la práctica
+    # cada uno recibe solo el tipo con el que se registra, así que la conversión es segura.
+    app.add_exception_handler(OrdenError, cast(ExceptionHandler, manejar_orden_error))
+    app.add_exception_handler(RequestValidationError, cast(ExceptionHandler, manejar_validacion))
