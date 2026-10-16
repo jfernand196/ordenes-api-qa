@@ -36,9 +36,9 @@ show_missing = true
 skip_covered = false
 
 [tool.mutmut]
-paths_to_mutate = ["app/"]
+source_paths = ["app/"]
 do_not_mutate = ["app/api/*", "app/core/*", "app/infrastructure/*", "app/main.py"]
-tests_dir = ["tests/"]
+pytest_add_cli_args_test_selection = ["tests/"]
 
 [tool.ruff]
 line-length = 100
