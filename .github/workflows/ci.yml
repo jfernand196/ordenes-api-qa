@@ -178,3 +178,41 @@ jobs:
       - run: npm run typecheck
       - run: npm test -- --run
       - run: npm run build
+
+  e2e:
+    name: Pruebas E2E (Playwright)
+    needs: [frontend, unit-tests]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Levantar API y web
+        run: docker compose up -d --build --wait
+      - name: Instalar dependencias y Chromium
+        working-directory: frontend
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+      - name: Playwright
+        working-directory: frontend
+        run: npx playwright test
+      - name: Logs de la API y la web
+        if: always()
+        run: |
+          mkdir -p reports
+          docker compose logs > reports/stack-e2e.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright
+          path: |
+            frontend/playwright-report
+            frontend/test-results
+            reports/stack-e2e.log
+      - name: Apagar
+        if: always()
+        run: docker compose down
