@@ -376,7 +376,7 @@ export function ListadoOrdenes() {
 ```tsx
 import { type FormEvent, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { aApiError, type ApiError, ordenesApi } from '../api/ordenes';
+import { aApiError, ApiError, ordenesApi } from '../api/ordenes';
 import { Campo } from '../componentes/Campo';
 import { MensajeError, errorDeCampo } from '../componentes/MensajeError';
 import { formatoMoneda } from '../formato';
@@ -399,8 +399,22 @@ export function NuevaOrden() {
     0,
   );
 
-  const actualizar = (clave: number, campo: 'id' | 'cantidad' | 'valorUnitario', valor: string) =>
+  // Al editar un campo, su error deja de mostrarse: ya no describe lo que hay en pantalla.
+  const limpiarErrorDe = (campo: string) =>
+    setError((e) =>
+      e?.problema.errores
+        ? new ApiError(e.status, {
+            ...e.problema,
+            errores: e.problema.errores.filter((x) => x.campo !== campo),
+          })
+        : e,
+    );
+
+  const actualizar = (clave: number, campo: 'id' | 'cantidad' | 'valorUnitario', valor: string) => {
+    const i = filas.findIndex((f) => f.clave === clave);
     setFilas((fs) => fs.map((f) => (f.clave === clave ? { ...f, [campo]: valor } : f)));
+    limpiarErrorDe(`productos.${i}.${campo}`);
+  };
 
   async function guardar(evento: FormEvent) {
     evento.preventDefault();
@@ -427,10 +441,13 @@ export function NuevaOrden() {
       <Link to="/">Volver al listado</Link>
       <h1>Nueva orden</h1>
 
-      {error && <MensajeError error={error} conDetalle={false} />}
+      {error && error.problema.errores?.length !== 0 && <MensajeError error={error} conDetalle={false} />}
 
       <form onSubmit={guardar} noValidate>
-        <Campo etiqueta="Cliente" valor={cliente} onCambio={setCliente}
+        <Campo etiqueta="Cliente" valor={cliente} onCambio={(v) => {
+            setCliente(v);
+            limpiarErrorDe('cliente');
+          }}
           error={errorDeCampo(error, 'cliente')} testId="input-cliente" />
 
         {filas.map((f, i) => (
@@ -445,7 +462,10 @@ export function NuevaOrden() {
                 onCambio={(v) => actualizar(f.clave, 'valorUnitario', v)}
                 error={errorDeCampo(error, `productos.${i}.valorUnitario`)} testId={`input-valor-${i}`} />
               {filas.length > 1 && (
-                <button type="button" onClick={() => setFilas((fs) => fs.filter((x) => x.clave !== f.clave))}>
+                <button type="button" onClick={() => {
+                  setFilas((fs) => fs.filter((x) => x.clave !== f.clave));
+                  setError(null); // los indices de los errores dejan de corresponder
+                }}>
                   Quitar
                 </button>
               )}
@@ -759,7 +779,7 @@ FROM nginx:1.27-alpine
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=build /app/dist /usr/share/nginx/html
 EXPOSE 80
-HEALTHCHECK --interval=10s --timeout=3s --retries=5 CMD wget -qO- http://localhost/ >/dev/null || exit 1
+HEALTHCHECK --interval=10s --timeout=3s --retries=5 CMD wget -qO- http://127.0.0.1/ >/dev/null || exit 1
 ```
 
 ### .dockerignore

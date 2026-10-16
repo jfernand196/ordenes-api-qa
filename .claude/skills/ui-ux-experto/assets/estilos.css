@@ -180,8 +180,9 @@ legend { padding: 0 6px; font-weight: 600; font-size: 0.9rem; color: var(--texto
   display: grid;
   grid-template-columns: 2fr 1fr 1.5fr auto;
   gap: 12px;
-  align-items: end;
+  align-items: start; /* un error bajo un campo no desalinea a los demas */
 }
+.fila-producto > button { margin-top: 28px; } /* a la altura de los inputs, bajo las etiquetas */
 
 .total {
   display: flex;
