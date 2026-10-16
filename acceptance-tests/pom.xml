@@ -8,7 +8,7 @@
     <artifactId>acceptance-tests</artifactId>
     <version>1.0.0</version>
     <packaging>jar</packaging>
-    <name>Pruebas de aceptaciÃ³n de la API de Ã³rdenes</name>
+    <name>Pruebas de aceptación de la API de órdenes</name>
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>

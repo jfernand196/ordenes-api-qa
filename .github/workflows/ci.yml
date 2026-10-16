@@ -35,7 +35,12 @@ jobs:
         run: |
           ruff check .
           ruff format --check .
-
+      - name: Trazabilidad (todas las reglas con pruebas y matriz al día)
+        working-directory: .
+        run: |
+          python scripts/generar_trazabilidad.py --salida docs/TRACEABILITY.md --estricto
+          git diff --exit-code docs/TRACEABILITY.md || { echo "::error::docs/TRACEABILITY.md está desactualizado. Ejecuta scripts/generar_trazabilidad.py y haz commit."; exit 1; }
+          cat docs/TRACEABILITY.md >> "$GITHUB_STEP_SUMMARY"
   unit-tests:
     name: Pruebas unitarias e integración con cobertura
     needs: lint

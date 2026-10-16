@@ -6,7 +6,7 @@ Contenido:
 3. Matriz de transiciones
 4. Entidad Orden (RN-01, RN-02, RN-03 con Hypothesis)
 5. Servicio
-6. IntegraciÃ³n de la API
+6. Integración de la API
 
 ---
 
@@ -67,7 +67,7 @@ def cliente() -> TestClient:
 @pytest.fixture
 def payload_valido() -> dict:
     return {
-        "cliente": "Juan PÃ©rez",
+        "cliente": "Juan Pérez",
         "productos": [{"id": "P001", "cantidad": 2, "valorUnitario": 100000}],
     }
 
@@ -99,7 +99,7 @@ def llevar_a(cliente):
 
 ## 3. backend/tests/unit/domain/test_maquina_estados.py
 
-La matriz se escribe a mano a propÃ³sito. Si se derivara de `TRANSICIONES`, cualquier mutante del diccionario pasarÃ­a.
+La matriz se escribe a mano a propósito. Si se derivara de `TRANSICIONES`, cualquier mutante del diccionario pasaría.
 
 ```python
 import pytest
@@ -249,7 +249,7 @@ def test_id_de_producto_vacio_es_invalido():
 
 @pytest.mark.rn("RN-03")
 def test_total_del_ejemplo_del_enunciado():
-    orden = Orden(cliente="Juan PÃ©rez", productos=[linea(cantidad=2, valor=100000)])
+    orden = Orden(cliente="Juan Pérez", productos=[linea(cantidad=2, valor=100000)])
     assert orden.total == 200000
 
 
