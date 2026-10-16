@@ -28,7 +28,7 @@ Contenido:
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <maven.compiler.release>17</maven.compiler.release>
-        <karate.version>1.4.1</karate.version>
+        <karate.version>1.5.1</karate.version>
         <baseUrl>http://localhost:8080</baseUrl>
     </properties>
 
@@ -119,7 +119,7 @@ function fn() {
 ### src/test/java/ordenes/helpers/crear-orden.feature
 ```gherkin
 @ignore
-Feature: Helper para crear una orden válida
+Feature: Helper para crear una orden vÃ¡lida
 
   Scenario:
     * def cliente = karate.get('cliente', 'Cliente Karate')
@@ -134,7 +134,7 @@ Feature: Helper para crear una orden válida
 ### src/test/java/ordenes/helpers/cambiar-estado.feature
 ```gherkin
 @ignore
-Feature: Helper para cambiar el estado de una orden (espera éxito)
+Feature: Helper para cambiar el estado de una orden (espera Ã©xito)
 
   Scenario:
     Given url baseUrl
@@ -149,22 +149,22 @@ Feature: Helper para cambiar el estado de una orden (espera éxito)
 ## 5. src/test/java/ordenes/crear-orden.feature
 
 ```gherkin
-Feature: Crear órdenes de compra
+Feature: Crear Ã³rdenes de compra
 
   Background:
     * url baseUrl
 
   @smoke @RN-03
-  Scenario: Crear una orden válida
+  Scenario: Crear una orden vÃ¡lida
     Given path 'orders'
-    And request { cliente: 'Juan Pérez', productos: [{ id: 'P001', cantidad: 2, valorUnitario: 100000 }] }
+    And request { cliente: 'Juan PÃ©rez', productos: [{ id: 'P001', cantidad: 2, valorUnitario: 100000 }] }
     When method post
     Then status 201
     And match response ==
       """
       {
         id: '#uuid',
-        cliente: 'Juan Pérez',
+        cliente: 'Juan PÃ©rez',
         productos: [{ id: 'P001', cantidad: 2, valorUnitario: 100000 }],
         total: 200000,
         estado: 'CREADA',
@@ -172,8 +172,8 @@ Feature: Crear órdenes de compra
       }
       """
 
-  # Justificación: RN-03 exige que el total lo calcule el sistema; un total enviado
-  # por el cliente es un riesgo de manipulación de precios, por eso se rechaza.
+  # JustificaciÃ³n: RN-03 exige que el total lo calcule el sistema; un total enviado
+  # por el cliente es un riesgo de manipulaciÃ³n de precios, por eso se rechaza.
   @RN-03
   Scenario: Rechazar una orden que trae el total desde el cliente
     Given path 'orders'
@@ -181,10 +181,10 @@ Feature: Crear órdenes de compra
     When method post
     Then status 422
 
-  # Justificación: RN-01 y RN-02 son la primera barrera de calidad de datos; se
-  # verifican también contra la API desplegada, no solo en pruebas unitarias.
+  # JustificaciÃ³n: RN-01 y RN-02 son la primera barrera de calidad de datos; se
+  # verifican tambiÃ©n contra la API desplegada, no solo en pruebas unitarias.
   @RN-01 @RN-02
-  Scenario Outline: Rechazar una orden inválida: <caso>
+  Scenario Outline: Rechazar una orden invÃ¡lida: <caso>
     Given path 'orders'
     And request <payload>
     When method post
@@ -205,7 +205,7 @@ Feature: Crear órdenes de compra
 ## 6. src/test/java/ordenes/consultar-orden.feature
 
 ```gherkin
-Feature: Consultar y listar órdenes
+Feature: Consultar y listar Ã³rdenes
 
   Background:
     * url baseUrl
@@ -220,7 +220,7 @@ Feature: Consultar y listar órdenes
     And match response.id == ordenId
     And match response.estado == 'CREADA'
 
-  # Justificación: un id inexistente es un error frecuente de los consumidores;
+  # JustificaciÃ³n: un id inexistente es un error frecuente de los consumidores;
   # debe responder 404 con Problem Details y no un 500.
   Scenario: Consultar una orden inexistente
     Given path 'orders', '00000000-0000-0000-0000-000000000000'
@@ -228,7 +228,7 @@ Feature: Consultar y listar órdenes
     Then status 404
     And match response.codigo == 'NO_ENCONTRADA'
 
-  Scenario: Listar órdenes filtradas por estado
+  Scenario: Listar Ã³rdenes filtradas por estado
     * call read(cambiarEstado) { id: '#(ordenId)', estado: 'PAGADA' }
     Given path 'orders'
     And param estado = 'PAGADA'
@@ -269,7 +269,7 @@ Feature: Transiciones de estado de una orden
     Then status 409
     And match response.codigo == 'RN-04'
 
-  # Justificación: es el camino feliz de mayor valor de negocio; si se rompe,
+  # JustificaciÃ³n: es el camino feliz de mayor valor de negocio; si se rompe,
   # ninguna orden llega al cliente.
   @smoke @RN-05 @RN-06
   Scenario: Ciclo de vida completo hasta entregada
@@ -282,10 +282,10 @@ Feature: Transiciones de estado de una orden
     And match response.estado == 'ENTREGADA'
     And match response.transicionesPermitidas == []
 
-  # Justificación: saltarse estados (CREADA → ENTREGADA) es la transición inválida
-  # de mayor impacto: entregaría mercancía sin pago ni envío registrados.
+  # JustificaciÃ³n: saltarse estados (CREADA â†’ ENTREGADA) es la transiciÃ³n invÃ¡lida
+  # de mayor impacto: entregarÃ­a mercancÃ­a sin pago ni envÃ­o registrados.
   @RN-06
-  Scenario: Rechazar una transición que se salta estados
+  Scenario: Rechazar una transiciÃ³n que se salta estados
     Given path 'orders', ordenId, 'status'
     And request { estado: 'ENTREGADA' }
     When method patch
