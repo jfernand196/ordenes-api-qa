@@ -122,6 +122,8 @@ jobs:
           curl -fsS -X POST http://localhost:8080/orders \
             -H "Content-Type: application/json" \
             -d '{"cliente":"CI","productos":[{"id":"P1","cantidad":1,"valorUnitario":1000}]}'
+          curl -fsS http://localhost:3000/ | grep -q 'id="root"'
+          curl -fsS http://localhost:3000/api/health
       - name: Logs de la API
         if: always()
         run: docker compose logs api
@@ -158,3 +160,21 @@ jobs:
       - name: Apagar
         if: always()
         run: docker compose down
+
+  frontend:
+    name: Frontend (tipos, pruebas y build)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test -- --run
+      - run: npm run build
