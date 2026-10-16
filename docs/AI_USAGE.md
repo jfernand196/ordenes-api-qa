@@ -1,7 +1,5 @@
 # Uso de inteligencia artificial
 
-> Borrador para revisar: confirma o ajusta cada punto para que refleje tu experiencia real.
-
 ## Herramientas
 
 | Herramienta | Uso |
