@@ -12,7 +12,7 @@ Las reglas de negocio (RN-01 a RN-06) son el corazón del reto y deben probarse 
 Separar el backend en capas con dependencias en una sola dirección:
 
 - `domain`: entidades, máquina de estados y excepciones, sin FastAPI ni Pydantic.
-- `application`: servicio que orquesta los casos de uso y depende de la interfaz `OrderRepository`.
+- `application`: servicio que orquesta los casos de uso y depende de la interfaz `RepositorioOrdenes`, definida en la propia capa (`puertos.py`).
 - `infrastructure`: implementación del repositorio.
 - `api`: endpoints, schemas y traducción de excepciones a HTTP.
 
@@ -25,6 +25,10 @@ Dirección de dependencias: `api → application → domain` e `infrastructure �
 
 ## Consecuencias
 
-- Las reglas se prueban con pruebas unitarias puras: 76 pruebas en unos 2 segundos.
+- Las reglas se prueban con pruebas unitarias puras: 79 pruebas en unos 2 segundos.
 - El mutation testing se limita a dominio y aplicación, donde están las reglas, y llega a 100 %.
 - Hay algo de código de mapeo entre schemas y entidades (`OrdenOut.desde_dominio`).
+
+## Historial
+
+- **v1.1.0:** una revisión de SOLID encontró que la interfaz del repositorio estaba en `infrastructure/`, de modo que la capa de aplicación importaba de la infraestructura, al revés de lo que establece este ADR. Se movió a `application/puertos.py`. En la misma revisión, `Orden` pasó a encapsular su estado y sus productos, para que nadie pueda saltarse la máquina de estados.
