@@ -64,3 +64,52 @@ Feature: Transiciones de estado de una orden
     When method delete
     Then status 200
     And match response.estado == 'CANCELADA'
+
+  # Justificación: ENTREGADA es terminal. Reactivarla o moverla de nuevo a otro estado
+  # alteraría una orden cerrada (riesgo crítico según transiciones_sin_aceptacion del MCP).
+  @RN-04
+  Scenario Outline: Rechazar cambios sobre una orden entregada: ENTREGADA a <destino>
+    * call read(cambiarEstado) { id: '#(ordenId)', estado: 'PAGADA' }
+    * call read(cambiarEstado) { id: '#(ordenId)', estado: 'ENVIADA' }
+    * call read(cambiarEstado) { id: '#(ordenId)', estado: 'ENTREGADA' }
+    Given path 'orders', ordenId, 'status'
+    And request { estado: '<destino>' }
+    When method patch
+    Then status 409
+    And match karate.response.header('Content-Type') contains 'application/problem+json'
+    And match response.codigo == 'RN-04'
+    Given path 'orders', ordenId
+    When method get
+    Then status 200
+    And match response.estado == 'ENTREGADA'
+
+    Examples:
+      | destino |
+      | CREADA  |
+      | PAGADA  |
+      | ENVIADA |
+
+  # Justificación: CANCELADA es terminal. Ningún cambio posterior debe revivir la orden,
+  # ni siquiera hacia ENTREGADA, que despacharía mercancía de una orden anulada.
+  @RN-04
+  Scenario Outline: Rechazar cambios sobre una orden cancelada: CANCELADA a <destino>
+    Given path 'orders', ordenId
+    When method delete
+    Then status 200
+    Given path 'orders', ordenId, 'status'
+    And request { estado: '<destino>' }
+    When method patch
+    Then status 409
+    And match karate.response.header('Content-Type') contains 'application/problem+json'
+    And match response.codigo == 'RN-04'
+    Given path 'orders', ordenId
+    When method get
+    Then status 200
+    And match response.estado == 'CANCELADA'
+
+    Examples:
+      | destino   |
+      | CREADA    |
+      | PAGADA    |
+      | ENVIADA   |
+      | ENTREGADA |
