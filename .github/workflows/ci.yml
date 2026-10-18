@@ -116,7 +116,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Build de la imagen (comando del enunciado)
-        run: docker build -t challenge-api:${{ github.sha }} ./backend
+        run: docker build -t challenge-api:${{ github.sha }} .
       - name: Prueba de humo con docker compose
         run: |
           docker compose up -d --build --wait
