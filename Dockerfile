@@ -1,3 +1,6 @@
+# Imagen de la API. Vive en la raíz para que funcione el comando del enunciado:
+#   docker build -t challenge-api .
+# docker-compose y el CI usan este mismo archivo (una sola receta).
 FROM python:3.12-slim AS base
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
@@ -6,12 +9,12 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 WORKDIR /app
 
 FROM base AS dependencias
-COPY requirements.txt .
+COPY backend/requirements.txt .
 RUN pip install --prefix=/install -r requirements.txt
 
 FROM base AS ejecucion
 COPY --from=dependencias /install /usr/local
-COPY app ./app
+COPY backend/app ./app
 RUN useradd --create-home --uid 10001 appuser
 USER appuser
 EXPOSE 8080

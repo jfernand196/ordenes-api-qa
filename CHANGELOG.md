@@ -2,6 +2,11 @@
 
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y versionado semántico.
 
+## [1.2.1] - 2026-10-18
+
+### Corregido
+- El comando del enunciado `docker build -t challenge-api .` funciona desde la raíz del repositorio: el `Dockerfile` de la API pasó de `backend/` a la raíz, con un `.dockerignore` de lista de permitidos. docker-compose y el CI usan ese mismo archivo, sin duplicar la receta.
+
 ## [1.2.0] - 2026-10-17
 
 ### Agregado

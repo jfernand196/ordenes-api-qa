@@ -10,8 +10,8 @@ El enunciado pide que el pipeline incluya checkout, build, pruebas unitarias, co
 ## Archivos
 
 ```
-backend/Dockerfile
-backend/.dockerignore
+Dockerfile (raíz del repositorio)
+.dockerignore (raíz del repositorio)
 frontend/Dockerfile           (plantilla en el skill react-frontend-ordenes)
 docker-compose.yml            raíz del repo
 .github/workflows/ci.yml
@@ -21,7 +21,7 @@ Plantillas completas en `references/plantillas.md`. Léelas antes de crear o mod
 
 ## Docker
 
-- **Backend**: multi-stage sobre `python:3.12-slim`, usuario no root, `HEALTHCHECK` contra `/health`, puerto **8080**. Así funcionan literalmente los comandos del enunciado: `docker build -t challenge-api ./backend` y `docker run -p 8080:8080 challenge-api`.
+- **Backend**: multi-stage sobre `python:3.12-slim`, usuario no root, `HEALTHCHECK` contra `/health`, puerto **8080**. Así funcionan literalmente los comandos del enunciado: `docker build -t challenge-api .` y `docker run -p 8080:8080 challenge-api`.
 - **Compose**: servicio `api` (8080) con healthcheck y servicio `web` (3000 → 80) que espera con `condition: service_healthy`. Usa `docker compose up -d --build --wait` en local y en CI: `--wait` bloquea hasta que los healthchecks pasan, lo que evita fallos intermitentes de Karate y Playwright.
 - El healthcheck usa Python (`urllib`) porque la imagen slim no trae `curl`.
 

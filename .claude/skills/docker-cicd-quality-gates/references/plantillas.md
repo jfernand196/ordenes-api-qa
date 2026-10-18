@@ -9,8 +9,11 @@ Contenido:
 
 ## 1. Backend
 
-### backend/Dockerfile
+### Dockerfile (raíz del repositorio)
 ```dockerfile
+# Imagen de la API. Vive en la raíz para que funcione el comando del enunciado:
+#   docker build -t challenge-api .
+# docker-compose y el CI usan este mismo archivo (una sola receta).
 FROM python:3.12-slim AS base
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
@@ -19,12 +22,12 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 WORKDIR /app
 
 FROM base AS dependencias
-COPY requirements.txt .
+COPY backend/requirements.txt .
 RUN pip install --prefix=/install -r requirements.txt
 
 FROM base AS ejecucion
 COPY --from=dependencias /install /usr/local
-COPY app ./app
+COPY backend/app ./app
 RUN useradd --create-home --uid 10001 appuser
 USER appuser
 EXPOSE 8080
@@ -33,20 +36,15 @@ HEALTHCHECK --interval=10s --timeout=3s --start-period=5s --retries=5 \
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080", "--no-access-log"]
 ```
 
-### backend/.dockerignore
+### .dockerignore (raíz del repositorio)
 ```text
-.venv
-__pycache__
-*.pyc
-.pytest_cache
-.ruff_cache
-.coverage
-htmlcov
-coverage.xml
-mutants
-reports
-tests
-scripts
+# Contexto de build de la API (Dockerfile en la raíz). Lista de permitidos:
+# se excluye todo y solo entra lo que la imagen necesita.
+*
+!backend/requirements.txt
+!backend/app/
+**/__pycache__
+**/*.pyc
 ```
 
 ---
@@ -56,7 +54,7 @@ scripts
 ```yaml
 services:
   api:
-    build: ./backend
+    build: .
     image: challenge-api
     ports:
       - "8080:8080"
@@ -207,7 +205,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Build de la imagen (comando del enunciado)
-        run: docker build -t challenge-api:${{ github.sha }} ./backend
+        run: docker build -t challenge-api:${{ github.sha }} .
       - name: Prueba de humo con docker compose
         run: |
           docker compose up -d --build --wait

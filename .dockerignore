@@ -1,0 +1,7 @@
+# Contexto de build de la API (Dockerfile en la raíz). Lista de permitidos:
+# se excluye todo y solo entra lo que la imagen necesita.
+*
+!backend/requirements.txt
+!backend/app/
+**/__pycache__
+**/*.pyc

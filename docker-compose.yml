@@ -1,6 +1,6 @@
 services:
   api:
-    build: ./backend
+    build: .
     image: challenge-api
     ports:
       - "8080:8080"

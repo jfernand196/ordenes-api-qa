@@ -155,7 +155,7 @@ docker compose up -d --build --wait
 Solo la API, con los comandos del enunciado:
 
 ```bash
-docker build -t challenge-api ./backend
+docker build -t challenge-api .
 docker run -p 8080:8080 challenge-api
 ```
 
