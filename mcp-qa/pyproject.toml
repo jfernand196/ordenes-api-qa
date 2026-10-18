@@ -1,0 +1,30 @@
+[project]
+name = "mcp-qa"
+version = "1.2.0"
+requires-python = ">=3.12"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = [".", "../backend", "../scripts"]
+addopts = "-ra"
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "SIM"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["qa", "servidor"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+plugins = ["pydantic.mypy"]
+mypy_path = ["../backend", "../scripts"]
+files = ["servidor.py", "qa"]
+
+[[tool.mypy.overrides]]
+module = ["generar_trazabilidad"]
+ignore_errors = true
