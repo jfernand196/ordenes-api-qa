@@ -6,6 +6,7 @@
 |---|---|
 | Claude (Anthropic), en claude.ai | Planificación, código base, pruebas, revisión, diagnóstico de errores y documentación |
 | Skills de Claude (`.claude/skills/`) | Convenciones del proyecto empaquetadas como instrucciones reutilizables |
+| Servidor MCP propio (`mcp-qa/`) | Herramientas deterministas de QA que Claude consulta: trazabilidad, brechas de aceptación y datos de prueba |
 
 ## Cómo se usó
 
@@ -34,6 +35,7 @@ Nada se integró sin verificarlo:
 | El `TestClient` de Starlette mostraba un aviso de deprecación de `httpx` | Warning de pytest | Se revisó la documentación y se cambió a `httpx2` |
 | Los errores de validación seguían visibles después de corregir el campo | Prueba manual en el navegador | Corrección y prueba de regresión |
 | El healthcheck de nginx fallaba aunque la web funcionaba (en Alpine, `localhost` resuelve a IPv6) | `docker compose ps` mostraba `unhealthy` | Healthcheck contra `127.0.0.1` |
+| El detector de brechas del servidor MCP no expandía los `Scenario Outline` ni avanzaba el estado tras un DELETE exitoso, lo que habría reportado una cobertura falsa | Claude Code lo encontró al cubrir las brechas críticas con ayuda del propio servidor | Expansión de `Examples`, avance de estado tras respuestas 2xx y prueba nueva; cambio revisado línea por línea y verificado con Karate (22 escenarios) |
 
 ## Límites
 

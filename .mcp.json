@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "qa-ordenes": {
+      "command": "backend/.venv/Scripts/python.exe",
+      "args": ["mcp-qa/servidor.py"]
+    }
+  }
+}

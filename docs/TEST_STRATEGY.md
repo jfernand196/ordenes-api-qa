@@ -10,7 +10,7 @@ El objetivo no es solo cumplir los mínimos del reto (80 % de cobertura y 70 % d
 
 | Riesgo | Probabilidad | Impacto | Nivel | Mitigación |
 |---|---|---|---|---|
-| Se permite una transición de estado inválida (RN-04, RN-05, RN-06) | Media | **Alto**: se entrega sin pago o se cancela lo ya entregado | **Alto** | Matriz unitaria literal de las 25 combinaciones, integración HTTP, 5 escenarios Karate |
+| Se permite una transición de estado inválida (RN-04, RN-05, RN-06) | Media | **Alto**: se entrega sin pago o se cancela lo ya entregado | **Alto** | Matriz unitaria literal de las 25 combinaciones, integración HTTP, 12 escenarios Karate (incluidas las 7 salidas de estados terminales) |
 | Total mal calculado o manipulado por el cliente (RN-03) | Media | **Alto**: pérdida económica | **Alto** | Unitarias con valores conocidos, prueba por propiedades (Hypothesis), rechazo de `total` en API y Karate |
 | Orden sin productos o con cantidades inválidas (RN-01, RN-02) | Alta | Medio: datos corruptos | **Medio** | Valores frontera (−1, 0, 1), validación en API y dominio, `Scenario Outline` en Karate |
 | Contrato HTTP incorrecto (código, formato de error, headers) | Media | Medio: rompe a los consumidores | **Medio** | Integración con `TestClient` y validación de esquema en Karate (`match`, `Location`, `content-type`, `codigo`) |
@@ -24,7 +24,7 @@ El objetivo no es solo cumplir los mínimos del reto (80 % de cobertura y 70 % d
 |---|---|---|---|---|
 | Unitarias | pytest + Hypothesis | 79 | Reglas de dominio, máquina de estados, servicio, mensajes, logs, manejo de errores | ~2 s |
 | Integración | pytest + `TestClient` | 20 | Contrato HTTP de los 5 endpoints y Problem Details | ~1 s |
-| Aceptación | Karate | 15 escenarios | API desplegada en Docker, flujos de negocio de punta a punta | ~20 s |
+| Aceptación | Karate | 22 escenarios | API desplegada en Docker, flujos de negocio de punta a punta | ~20 s |
 
 La base es ancha porque el riesgo principal está en la **lógica de dominio**, que se prueba en milisegundos y sin dependencias. Los niveles superiores son más lentos y caros de mantener, así que no repiten las reglas: confirman que las piezas están bien conectadas y que el contrato HTTP se cumple.
 
