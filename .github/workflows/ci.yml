@@ -218,3 +218,27 @@ jobs:
       - name: Apagar
         if: always()
         run: docker compose down
+
+  mcp-qa:
+    name: Servidor MCP de QA
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mcp-qa
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: |
+            mcp-qa/requirements.txt
+            backend/requirements-dev.txt
+      - run: pip install -r requirements.txt
+      - name: Lint, formato y tipos
+        run: |
+          ruff check .
+          ruff format --check .
+          mypy
+      - name: Pruebas
+        run: pytest -q
