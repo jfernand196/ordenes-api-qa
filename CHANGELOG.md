@@ -2,6 +2,14 @@
 
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y versionado semántico.
 
+## [1.2.0] - 2026-10-17
+
+### Agregado
+- Servidor MCP de QA (`mcp-qa/`) con cuatro herramientas de solo lectura: reglas de negocio, matriz de trazabilidad, transiciones sin prueba de aceptación (ordenadas por riesgo) y datos de prueba derivados del schema.
+- `.mcp.json` para usarlo desde Claude Code.
+- Job `mcp-qa` en el CI: ruff, mypy estricto y pytest.
+- ADR-004.
+
 ## [1.1.1] - 2026-10-17
 
 ### Agregado

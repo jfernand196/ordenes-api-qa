@@ -6,6 +6,7 @@
 |---|---|
 | Claude (Anthropic), en claude.ai | Planificación, código base, pruebas, revisión, diagnóstico de errores y documentación |
 | Skills de Claude (`.claude/skills/`) | Convenciones del proyecto empaquetadas como instrucciones reutilizables |
+| Servidor MCP propio (`mcp-qa/`) | Herramientas deterministas de QA que Claude consulta: trazabilidad, brechas de aceptación y datos de prueba |
 
 ## Cómo se usó
 

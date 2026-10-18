@@ -13,7 +13,7 @@ Solución al reto técnico de **Ingeniero/a de Software QA**: una API REST para 
 | Escenarios de aceptación (Karate) | **15** (4 obligatorios + 11 justificados) | 4 |
 | Pruebas de componentes (Vitest) | **7** | — |
 | Flujos E2E (Playwright) | **6** | — |
-| Jobs del pipeline | **7**, todos en verde | — |
+| Jobs del pipeline | **8**, todos en verde | — |
 
 ## Contenido
 
@@ -24,6 +24,7 @@ Solución al reto técnico de **Ingeniero/a de Software QA**: una API REST para 
 - [Cómo ejecutar las pruebas](#cómo-ejecutar-las-pruebas)
 - [Estrategia de calidad](#estrategia-de-calidad)
 - [Evidencias](#evidencias)
+- [Servidor MCP de QA](#servidor-mcp-de-qa)
 - [Uso de IA](#uso-de-ia)
 
 ## Descripción de la solución
@@ -239,6 +240,7 @@ flowchart LR
   U --> K[Karate]
   F[Frontend] --> E[Playwright E2E]
   U --> E
+  Q[Servidor MCP de QA]
 ```
 
 ### Versionamiento
@@ -272,6 +274,44 @@ Ejecuciones: [GitHub Actions](https://github.com/jfernand196/ordenes-api-qa/acti
 ![Reporte de Playwright con 6 flujos en verde](docs/evidence/playwright.jpg)
 
 Cada ejecución del pipeline publica además los reportes completos como artifacts: `cobertura`, `mutation`, `karate` y `playwright`.
+
+## Servidor MCP de QA
+
+[`mcp-qa/`](mcp-qa) es un servidor [MCP](https://modelcontextprotocol.io) que expone la información de calidad del proyecto como herramientas que un asistente de IA (por ejemplo, Claude Code) puede consultar. Es determinista, de solo lectura y no necesita clave de API. Ver [ADR-004](docs/adr/004-servidor-mcp-qa.md).
+
+| Herramienta | Qué devuelve |
+|---|---|
+| `reglas_de_negocio` | RN-01 a RN-06, dónde se implementan y cuántas pruebas las verifican por nivel |
+| `matriz_trazabilidad` | Las pruebas de cada regla en cada nivel (opcional: una sola regla) |
+| `transiciones_sin_aceptacion` | Las transiciones de estado sin escenario Karate, ordenadas por riesgo (crítico, alto, medio, bajo) |
+| `datos_de_prueba` | Payloads para `POST /orders` válidos, de frontera o inválidos, con el status esperado y el campo con error |
+
+**Una sola fuente de verdad:** el servidor importa la máquina de estados, los schemas de la API y el escáner de trazabilidad del proyecto. Los límites de los datos de frontera se leen del schema (`gt=0`, `min_length=1`), y una prueba envía cada payload a la API real para comprobar que produce la respuesta que anuncia.
+
+**Cómo usarlo con Claude Code:**
+
+```bash
+backend\.venv\Scripts\activate          # el servidor usa el entorno del backend
+pip install -r mcp-qa/requirements.txt
+claude                                   # en la raíz del repo; aprobar el servidor qa-ordenes
+```
+
+`.mcp.json` registra el servidor para este proyecto. En Linux o macOS, cambia `command` a `backend/.venv/bin/python`. Luego puedes preguntar, por ejemplo: *"¿qué transiciones de estado no tienen prueba de aceptación? escribe los escenarios Karate de las críticas"*. Claude obtiene las brechas del servidor y usa el skill `karate-aceptacion` para escribir los escenarios con las convenciones del proyecto.
+
+Para probarlo sin Claude Code, con el MCP Inspector oficial (solo requiere Node):
+
+```bash
+npx @modelcontextprotocol/inspector backend/.venv/Scripts/python.exe mcp-qa/servidor.py
+```
+
+**Pruebas:** `cd mcp-qa && pytest` (en el CI: ruff, mypy estricto y pytest).
+
+### Mejoras futuras: LangChain y LangGraph
+
+- **LangChain:** generar borradores de escenarios Karate a partir del OpenAPI y de las brechas que reporta el servidor.
+- **LangGraph:** un agente que tome una brecha, escriba el escenario, lo ejecute contra la API en Docker, lo corrija si falla y pida aprobación humana antes de abrir un PR.
+
+Ambas requieren clave de API y revisión humana de lo generado; por eso se dejaron fuera del CI y de esta entrega.
 
 ## Uso de IA
 
