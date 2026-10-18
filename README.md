@@ -255,7 +255,7 @@ flowchart LR
 
 Ejecuciones: [GitHub Actions](https://github.com/jfernand196/ordenes-api-qa/actions/workflows/ci.yml)
 
-![Pipeline con los 7 jobs en verde](docs/evidence/pipeline.jpg)
+![Pipeline con los 8 jobs en verde](docs/evidence/pipeline.jpg)
 
 ### Cobertura
 
@@ -267,7 +267,7 @@ Ejecuciones: [GitHub Actions](https://github.com/jfernand196/ordenes-api-qa/acti
 
 ### Pruebas de aceptación (Karate)
 
-![Reporte de Karate con 15 escenarios en verde](docs/evidence/karate.jpg)
+![Reporte de Karate con 22 escenarios en verde](docs/evidence/karate.jpg)
 
 ### Pruebas E2E (Playwright)
 
