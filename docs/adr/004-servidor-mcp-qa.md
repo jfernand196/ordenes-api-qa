@@ -34,6 +34,6 @@ Principios:
 ## Consecuencias
 
 - Un asistente como Claude Code responde preguntas como "¿qué transiciones no tienen prueba de aceptación?" con datos reales, y puede usar el skill de Karate para escribir los escenarios que faltan, que luego pasan por revisión y por el CI.
-- La herramienta de brechas detecta hoy 17 transiciones sin prueba de aceptación, 7 de ellas críticas (salir de un estado terminal); es información accionable para priorizar.
+- Al crearse, la herramienta de brechas detectó 17 transiciones sin prueba de aceptación, 7 de ellas críticas (salir de un estado terminal). Con esa información se agregaron dos `Scenario Outline` que cubren las 7; quedan 10 brechas de riesgo alto, medio o bajo, y una prueba del servidor falla si vuelve a aparecer una crítica sin cubrir.
 - El servidor depende del código del backend, por lo que se ejecuta con su entorno virtual.
 - Se usa la v2 del SDK, publicada el 28 de julio de 2026, que renombró `FastMCP` a `MCPServer`.

@@ -9,6 +9,7 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y 
 - `.mcp.json` para usarlo desde Claude Code.
 - Job `mcp-qa` en el CI: ruff, mypy estricto y pytest.
 - ADR-004.
+- 7 escenarios Karate (dos `Scenario Outline`) para las transiciones críticas que detectó el servidor: salir de ENTREGADA o CANCELADA responde 409 y no modifica la orden.
 
 ## [1.1.1] - 2026-10-17
 

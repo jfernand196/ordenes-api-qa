@@ -10,7 +10,7 @@ Solución al reto técnico de **Ingeniero/a de Software QA**: una API REST para 
 | Cobertura de ramas | **100 %** | 80 % |
 | Mutation score | **100 %** (113 de 113 mutantes) | 70 % |
 | Pruebas unitarias e integración (pytest) | **99** | — |
-| Escenarios de aceptación (Karate) | **15** (4 obligatorios + 11 justificados) | 4 |
+| Escenarios de aceptación (Karate) | **22** (4 obligatorios + 18 justificados) | 4 |
 | Pruebas de componentes (Vitest) | **7** | — |
 | Flujos E2E (Playwright) | **6** | — |
 | Jobs del pipeline | **8**, todos en verde | — |
@@ -213,7 +213,7 @@ El reporte queda en `acceptance-tests/target/karate-reports/karate-summary.html`
 La estrategia completa está en [TEST_STRATEGY.md](docs/TEST_STRATEGY.md): matriz de riesgo, pirámide de pruebas, técnicas aplicadas y lo que quedó fuera de alcance. En resumen:
 
 - **Pruebas priorizadas por riesgo.** Las transiciones de estado y el cálculo del total, de mayor impacto económico, se prueban en todos los niveles; entre otras cosas, con una tabla literal de las 25 combinaciones origen → destino.
-- **Pirámide.** 79 pruebas unitarias, 20 de integración, 15 escenarios Karate, 7 pruebas de componentes y 6 flujos E2E. La base es ancha porque el riesgo principal está en el dominio, que se prueba en milisegundos.
+- **Pirámide.** 79 pruebas unitarias, 20 de integración, 22 escenarios Karate, 7 pruebas de componentes y 6 flujos E2E. La base es ancha porque el riesgo principal está en el dominio, que se prueba en milisegundos.
 - **Mutation testing, porque la cobertura no basta.** La primera corrida dio **58,4 %** con **100 % de cobertura**: el código se ejecutaba, pero no se verificaban los logs, los mensajes de error, el límite de paginación ni la llamada a `guardar`. Con las pruebas que faltaban, el score llegó a **100 %**. No hay mutantes aceptados.
 - **Trazabilidad.** Cada prueba lleva la regla que verifica (`@pytest.mark.rn("RN-04")`, `@RN-04` en Karate y en Playwright), y [TRACEABILITY.md](docs/TRACEABILITY.md) se genera automáticamente con la matriz regla → pruebas en los tres niveles.
 
@@ -287,6 +287,8 @@ Cada ejecución del pipeline publica además los reportes completos como artifac
 | `datos_de_prueba` | Payloads para `POST /orders` válidos, de frontera o inválidos, con el status esperado y el campo con error |
 
 **Una sola fuente de verdad:** el servidor importa la máquina de estados, los schemas de la API y el escáner de trazabilidad del proyecto. Los límites de los datos de frontera se leen del schema (`gt=0`, `min_length=1`), y una prueba envía cada payload a la API real para comprobar que produce la respuesta que anuncia.
+
+**Resultado:** al crearlo, `transiciones_sin_aceptacion` encontró **17 transiciones sin prueba de aceptación, 7 de ellas críticas** (salir de ENTREGADA o CANCELADA). Con esa información, Claude Code, usando este servidor y el skill `karate-aceptacion`, escribió dos `Scenario Outline` que las cubren y corrigió una limitación del detector (no expandía los `Scenario Outline`). Tras revisar el cambio y ejecutar Karate (22 escenarios en verde), **quedan 10 brechas de menor riesgo y ninguna crítica**; una prueba del servidor impide que vuelva a aparecer una crítica sin cubrir.
 
 **Cómo usarlo con Claude Code:**
 
