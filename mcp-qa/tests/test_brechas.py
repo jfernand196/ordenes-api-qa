@@ -40,7 +40,8 @@ def test_cubiertas_y_brechas_suman_las_25_combinaciones():
 def test_las_brechas_van_de_mayor_a_menor_riesgo():
     prioridades = [PRIORIDAD[b["riesgo"]] for b in sin_aceptacion()]
     assert prioridades == sorted(prioridades)
-    assert prioridades[0] == PRIORIDAD["critico"]
+    # Regresión: las transiciones desde estados terminales ya tienen escenario Karate.
+    assert PRIORIDAD["critico"] not in prioridades
 
 
 def test_ninguna_brecha_esta_cubierta_por_karate():
@@ -82,3 +83,41 @@ def test_ignora_los_helpers_y_las_features_sin_orden(tmp_path: Path):
         "Feature: c\n  Scenario: y\n    When method delete\n", encoding="utf-8"
     )
     assert transiciones_karate(tmp_path) == set()
+
+
+def test_expande_los_outlines_y_avanza_tras_una_respuesta_exitosa(tmp_path: Path):
+    (tmp_path / "terminal.feature").write_text(
+        """Feature: prueba
+  Background:
+    * def creada = call read(crearOrden)
+
+  Scenario Outline: cancelar y luego intentar <destino>
+    Given path 'orders', ordenId
+    When method delete
+    Then status 200
+    And request { estado: '<destino>' }
+    When method patch
+    Then status 409
+
+    Examples:
+      | destino |
+      | PAGADA  |
+      | ENVIADA |
+
+  Scenario: una cancelación rechazada no avanza el estado
+    * call read(cambiarEstado) { id: '#(ordenId)', estado: 'PAGADA' }
+    When method delete
+    Then status 409
+    And request { estado: 'ENVIADA' }
+    When method patch
+""",
+        encoding="utf-8",
+    )
+    assert transiciones_karate(tmp_path) == {
+        (E.CREADA, E.CANCELADA),
+        (E.CANCELADA, E.PAGADA),
+        (E.CANCELADA, E.ENVIADA),
+        (E.CREADA, E.PAGADA),
+        (E.PAGADA, E.CANCELADA),
+        (E.PAGADA, E.ENVIADA),
+    }

@@ -15,6 +15,7 @@ PRIORIDAD = {"critico": 0, "alto": 1, "medio": 2, "bajo": 3}
 
 _HELPER = re.compile(r"call read\(cambiarEstado\) \{.*estado: '(\w+)'")
 _REQUEST = re.compile(r"request \{ estado: '(\w+)' \}")
+_STATUS = re.compile(r"^\s*Then status (\d{3})")
 
 
 @dataclass(frozen=True)
@@ -39,11 +40,32 @@ def clasificar(desde: Estado, hacia: Estado) -> tuple[str, str]:
     return "medio", "Retrocede en el ciclo de vida."
 
 
+def _variantes(escenario: str) -> list[str]:
+    """Un Scenario Outline se expande en un escenario por fila de Examples."""
+    cuerpo, _, ejemplos = escenario.partition("Examples:")
+    filas = [
+        [celda.strip() for celda in linea.strip().strip("|").split("|")]
+        for linea in ejemplos.splitlines()
+        if linea.strip().startswith("|")
+    ]
+    if not filas:
+        return [cuerpo]
+    cabecera, *datos = filas
+    variantes = []
+    for fila in datos:
+        texto = cuerpo
+        for columna, valor in zip(cabecera, fila, strict=True):
+            texto = texto.replace(f"<{columna}>", valor)
+        variantes.append(texto)
+    return variantes
+
+
 def transiciones_karate(raiz: Path = KARATE) -> set[tuple[Estado, Estado]]:
     """Transiciones que ejercitan los escenarios Karate.
 
     Sigue el estado de la orden creada en el Background de cada escenario: cada llamada al
-    helper cambiarEstado lo avanza, y cada PATCH o DELETE prueba una transición.
+    helper cambiarEstado lo avanza, y cada PATCH o DELETE prueba una transición, que también
+    lo avanza si el siguiente `Then status` es 2xx.
     """
     cubiertas: set[tuple[Estado, Estado]] = set()
     for archivo in sorted(raiz.rglob("*.feature")):
@@ -52,9 +74,11 @@ def transiciones_karate(raiz: Path = KARATE) -> set[tuple[Estado, Estado]]:
         texto = archivo.read_text(encoding="utf-8")
         if "call read(crearOrden)" not in texto:
             continue
-        for escenario in re.split(r"^\s*Scenario(?: Outline)?:", texto, flags=re.M)[1:]:
+        escenarios = re.split(r"^\s*Scenario(?: Outline)?:", texto, flags=re.M)[1:]
+        for escenario in (v for e in escenarios for v in _variantes(e)):
             actual = Estado.CREADA
             pendiente: Estado | None = None
+            probada: Estado | None = None
             for linea in escenario.splitlines():
                 if m := _HELPER.search(linea):
                     nuevo = Estado(m.group(1))
@@ -64,8 +88,14 @@ def transiciones_karate(raiz: Path = KARATE) -> set[tuple[Estado, Estado]]:
                     pendiente = Estado(m.group(1))
                 elif "method patch" in linea and pendiente is not None:
                     cubiertas.add((actual, pendiente))
+                    probada, pendiente = pendiente, None
                 elif "method delete" in linea:
                     cubiertas.add((actual, Estado.CANCELADA))
+                    probada = Estado.CANCELADA
+                elif m := _STATUS.search(linea):
+                    if probada is not None and m.group(1).startswith("2"):
+                        actual = probada
+                    probada = None
     return cubiertas
 
 
