@@ -32,7 +32,7 @@ Solución al reto técnico de **Ingeniero/a de Software QA**: una API REST para 
 - **Backend:** API REST en Python 3.12 con FastAPI. Implementa las reglas RN-01 a RN-06 con una máquina de estados explícita, devuelve errores en formato Problem Details (RFC 9457) con el código de la regla que los produce, y registra logs en JSON con `X-Request-ID` para trazar cada petición.
 - **Pruebas:** pytest (unitarias, integración y por propiedades con Hypothesis), mutmut, Karate, Vitest y Playwright, cada prueba etiquetada con la regla que verifica.
 - **Despliegue:** Docker y docker-compose; la API en el puerto 8080 y la web en el 3000.
-- **CI/CD:** GitHub Actions con 7 jobs y quality gates de lint, cobertura, mutation score, trazabilidad, pruebas fallidas e imagen Docker.
+- **CI/CD:** GitHub Actions con 8 jobs y quality gates de lint, tipos, cobertura, mutation score, trazabilidad, pruebas fallidas e imagen Docker.
 - **Frontend (plus):** React + Vite + TypeScript, servido con nginx.
 
 ## Arquitectura
